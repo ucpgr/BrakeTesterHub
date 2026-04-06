@@ -11,56 +11,56 @@ namespace brake_tester {
 
 class SettingsRepository final : public ISettingsRepository {
 public:
-  explicit SettingsRepository(sqlite3* db) : db_(db) {
-    if (db_ == nullptr) {
+  explicit SettingsRepository(sqlite3* databaseHandle) : m_DatabaseHandle(databaseHandle) {
+    if (m_DatabaseHandle == nullptr) {
       throw std::invalid_argument("SettingsRepository requires a valid sqlite3 handle");
     }
   }
 
   SerialSettings getSerialSettings() const override {
-    std::scoped_lock lock(mutex_);
-    return cached_settings_;
+    std::scoped_lock lock(m_Mutex);
+    return m_CachedSerialSettings;
   }
 
-  void setSerialSettings(const SerialSettings& settings) override {
-    std::scoped_lock lock(mutex_);
-    cached_settings_ = settings;
+  void setSerialSettings(const SerialSettings& serialSettings) override {
+    std::scoped_lock lock(m_Mutex);
+    m_CachedSerialSettings = serialSettings;
 
-    // Placeholder for sqlite persistence via db_.
+    // Placeholder for sqlite persistence via m_DatabaseHandle.
     // Production implementation can bind and execute a prepared statement.
   }
 
 private:
-  sqlite3* db_;
-  mutable std::mutex mutex_;
-  SerialSettings cached_settings_{};
+  sqlite3* m_DatabaseHandle;
+  mutable std::mutex m_Mutex;
+  SerialSettings m_CachedSerialSettings{};
 };
 
 class SelectedVehicleStore final : public ISelectedVehicleStore {
 public:
-  explicit SelectedVehicleStore(sqlite3* db) : db_(db) {
-    if (db_ == nullptr) {
+  explicit SelectedVehicleStore(sqlite3* databaseHandle) : m_DatabaseHandle(databaseHandle) {
+    if (m_DatabaseHandle == nullptr) {
       throw std::invalid_argument("SelectedVehicleStore requires a valid sqlite3 handle");
     }
   }
 
   VehicleSelection getSelectedVehicle() const override {
-    std::scoped_lock lock(mutex_);
-    return selected_vehicle_;
+    std::scoped_lock lock(m_Mutex);
+    return m_SelectedVehicle;
   }
 
-  void setSelectedVehicle(const VehicleSelection& selected_vehicle) override {
-    std::scoped_lock lock(mutex_);
-    selected_vehicle_ = selected_vehicle;
+  void setSelectedVehicle(const VehicleSelection& selectedVehicle) override {
+    std::scoped_lock lock(m_Mutex);
+    m_SelectedVehicle = selectedVehicle;
 
-    // Placeholder for sqlite persistence via db_.
+    // Placeholder for sqlite persistence via m_DatabaseHandle.
     // Production implementation can bind and execute a prepared statement.
   }
 
 private:
-  sqlite3* db_;
-  mutable std::mutex mutex_;
-  VehicleSelection selected_vehicle_{};
+  sqlite3* m_DatabaseHandle;
+  mutable std::mutex m_Mutex;
+  VehicleSelection m_SelectedVehicle{};
 };
 
 } // namespace brake_tester
