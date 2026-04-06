@@ -4,7 +4,6 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <thread>
 
 #include <sqlite3.h>
 
@@ -22,7 +21,7 @@ public:
     }
 
     m_SettingsRepository = std::make_unique<SettingsRepository>(m_DatabaseHandle);
-    m_SelectedVehicleStore = std::make_unique<SelectedVehicleStore>(m_DatabaseHandle);
+    m_SelectedVehicleStore = std::make_unique<SelectedVehicleStore>();
 
     auto listener = std::make_unique<LptListener>(*m_SettingsRepository);
     auto patcher = std::make_unique<PrnPatcher>(*m_SelectedVehicleStore);
@@ -41,8 +40,6 @@ public:
 
   void run() {
     m_LptManager->start();
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    m_LptManager->stop();
   }
 
   void shutdown() {
