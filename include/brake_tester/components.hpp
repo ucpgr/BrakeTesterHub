@@ -8,6 +8,7 @@
 #include <fstream>
 #include <functional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <utility>
@@ -41,6 +42,9 @@ public:
 
   std::vector<std::uint8_t> captureTransmission() override {
     const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
+    if (m_Log) {
+      m_Log->information("[LptListener Info]: Starting transmission capture cycle.");
+    }
 
     std::vector<std::uint8_t> transmissionBuffer;
     transmissionBuffer.reserve(2048);
@@ -49,8 +53,23 @@ public:
     if (serialSettings.devicePath.empty() && m_Log) {
       m_Log->Critical("Serial port path is empty");
     }
-    serialPort.Open(serialSettings.devicePath);
-    serialPort.SetBaudRate(toBaudRate(serialSettings.baudRate));
+    try {
+      if (m_Log) {
+        m_Log->information("[LptListener Info]: Opening serial device: " + serialSettings.devicePath);
+      }
+      serialPort.Open(serialSettings.devicePath);
+      serialPort.SetBaudRate(toBaudRate(serialSettings.baudRate));
+      if (m_Log) {
+        m_Log->information("[LptListener Info]: Serial device opened successfully.");
+      }
+    } catch (const std::exception& openException) {
+      std::string errorReason = openException.what();
+      if (errorReason.find("busy") != std::string::npos || errorReason.find("Device or resource busy") != std::string::npos) {
+        errorReason += " The serial device may already be open by another process.";
+      }
+      throw std::runtime_error(
+          "[LptManager Error]: Failed to open serial device '" + serialSettings.devicePath + "'. Reason: " + errorReason);
+    }
 
     bool hasSeenData = false;
     auto lastDataTimestamp = std::chrono::steady_clock::now();
@@ -74,6 +93,9 @@ public:
     }
 
     serialPort.Close();
+    if (m_Log) {
+      m_Log->information("[LptListener Info]: Serial device closed after capture cycle.");
+    }
     return transmissionBuffer;
   }
 
@@ -94,6 +116,9 @@ public:
   }
 
   std::vector<std::uint8_t> patch(const std::vector<std::uint8_t>& inputBytes) override {
+    if (m_Log) {
+      m_Log->information("[PrnPatcher Info]: Applying PRN patches to incoming bytes.");
+    }
     std::vector<std::uint8_t> patchedOutputBytes = inputBytes;
     const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
 
@@ -123,6 +148,9 @@ public:
   explicit PrnRenderer(SharedLogger log) : m_Log(std::move(log)) {}
 
   std::vector<RenderedPage> render(const std::vector<std::uint8_t>& patchedBytes) override {
+    if (m_Log) {
+      m_Log->information("[PrnRenderer Info]: Rendering patched bytes into page buffer.");
+    }
     RenderedPage renderedPage;
     renderedPage.pageIndex = 0;
     renderedPage.width = 1;
@@ -141,6 +169,9 @@ public:
       : m_OutputDirectory(std::move(outputDirectory)), m_Log(std::move(log)) {}
 
   void writePages(const std::vector<RenderedPage>& pages, const std::string& documentId) override {
+    if (m_Log) {
+      m_Log->information("[RenderedDocumentWriter Info]: Writing rendered pages to disk.");
+    }
     std::filesystem::create_directories(m_OutputDirectory);
 
     for (const auto& renderedPage : pages) {

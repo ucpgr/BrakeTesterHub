@@ -44,6 +44,9 @@ private:
         "value TEXT NOT NULL"
         ");";
     executeSql(createTableSql);
+    if (m_Log) {
+      m_Log->information("[SettingsRepository Info]: Ensured LptSettings schema exists.");
+    }
   }
 
   void loadCachedSerialSettings() {
@@ -59,6 +62,9 @@ private:
     const std::string readChunkSizeText =
         getSettingValueOrDefault("readChunkSize", std::to_string(m_CachedSerialSettings.readChunkSize));
     m_CachedSerialSettings.readChunkSize = static_cast<std::size_t>(std::strtoull(readChunkSizeText.c_str(), nullptr, 10));
+    if (m_Log) {
+      m_Log->information("[SettingsRepository Info]: Loaded LptSettings from database.");
+    }
   }
 
   std::string getSettingValueOrDefault(const std::string& settingName, const std::string& defaultValue) const {
@@ -97,6 +103,9 @@ private:
     persistSetting(statement, "silenceTimeoutMs", std::to_string(m_CachedSerialSettings.silenceTimeout.count()));
     persistSetting(statement, "readChunkSize", std::to_string(m_CachedSerialSettings.readChunkSize));
     finalizeStatement(statement);
+    if (m_Log) {
+      m_Log->information("[SettingsRepository Info]: Persisted serial settings to database.");
+    }
   }
 
   static void resetStatement(sqlite3_stmt* statement) {

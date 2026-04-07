@@ -32,6 +32,9 @@ public:
     if (m_IsRunning.exchange(true)) {
       return;
     }
+    if (m_Log) {
+      m_Log->information("[LptManager Info]: Starting worker thread.");
+    }
 
     m_WorkerThread = std::thread([this] {
       while (m_IsRunning) {
@@ -45,9 +48,9 @@ public:
           auto patchedBytes = m_Patcher->patch(incomingBytes);
           auto renderedPages = m_Renderer->render(patchedBytes);
           m_Writer->writePages(renderedPages, "capture");
-        } catch (const std::exception&) {
+        } catch (const std::exception& processingException) {
           if (m_Log) {
-            m_Log->Error("[LptManager Error]: Failed to open serial device.");
+            m_Log->Error(processingException.what());
             m_Log->information("[LptManager Info]: Trying again in 10 seconds.");
           }
 
@@ -66,6 +69,9 @@ public:
   void stop() {
     if (!m_IsRunning.exchange(false)) {
       return;
+    }
+    if (m_Log) {
+      m_Log->information("[LptManager Info]: Stopping worker thread.");
     }
 
     if (m_WorkerThread.joinable()) {
