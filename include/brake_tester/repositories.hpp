@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdlib>
 #include <mutex>
 #include <string>
 #include <stdexcept>
@@ -8,12 +9,14 @@
 #include <sqlite3.h>
 
 #include "brake_tester/interfaces.hpp"
+#include "brake_tester/logging.hpp"
 
 namespace brake_tester {
 
 class SettingsRepository final : public ISettingsRepository {
 public:
-  explicit SettingsRepository(sqlite3* databaseHandle) : m_DatabaseHandle(databaseHandle) {
+  SettingsRepository(sqlite3* databaseHandle, SharedLogger log)
+      : m_DatabaseHandle(databaseHandle), m_Log(std::move(log)) {
     if (m_DatabaseHandle == nullptr) {
       throw std::invalid_argument("SettingsRepository requires a valid sqlite3 handle");
     }
@@ -37,66 +40,82 @@ private:
   void initializeSchema() {
     static constexpr const char* createTableSql =
         "CREATE TABLE IF NOT EXISTS LptSettings ("
-        "Id INTEGER PRIMARY KEY CHECK (Id = 1),"
-        "DevicePath TEXT NOT NULL,"
-        "BaudRate INTEGER NOT NULL,"
-        "SilenceTimeoutMs INTEGER NOT NULL,"
-        "ReadChunkSize INTEGER NOT NULL"
+        "name TEXT PRIMARY KEY,"
+        "value TEXT NOT NULL"
         ");";
     executeSql(createTableSql);
   }
 
   void loadCachedSerialSettings() {
-    static constexpr const char* selectSql =
-        "SELECT DevicePath, BaudRate, SilenceTimeoutMs, ReadChunkSize "
-        "FROM LptSettings WHERE Id = 1;";
+    m_CachedSerialSettings.devicePath = getSettingValueOrDefault("devicePath", m_CachedSerialSettings.devicePath);
+
+    const std::string baudRateText = getSettingValueOrDefault("baudRate", std::to_string(m_CachedSerialSettings.baudRate));
+    m_CachedSerialSettings.baudRate = static_cast<std::uint32_t>(std::strtoul(baudRateText.c_str(), nullptr, 10));
+
+    const std::string silenceTimeoutText =
+        getSettingValueOrDefault("silenceTimeoutMs", std::to_string(m_CachedSerialSettings.silenceTimeout.count()));
+    m_CachedSerialSettings.silenceTimeout = std::chrono::milliseconds(std::strtol(silenceTimeoutText.c_str(), nullptr, 10));
+
+    const std::string readChunkSizeText =
+        getSettingValueOrDefault("readChunkSize", std::to_string(m_CachedSerialSettings.readChunkSize));
+    m_CachedSerialSettings.readChunkSize = static_cast<std::size_t>(std::strtoull(readChunkSizeText.c_str(), nullptr, 10));
+  }
+
+  std::string getSettingValueOrDefault(const std::string& settingName, const std::string& defaultValue) const {
+    static constexpr const char* selectSql = "SELECT value FROM LptSettings WHERE name = ?;";
     sqlite3_stmt* statement = nullptr;
     if (sqlite3_prepare_v2(m_DatabaseHandle, selectSql, -1, &statement, nullptr) != SQLITE_OK) {
-      throw std::runtime_error("Failed to prepare LptSettings select statement");
+      throw std::runtime_error("Failed to prepare LptSettings name/value select statement");
     }
+    sqlite3_bind_text(statement, 1, settingName.c_str(), -1, SQLITE_TRANSIENT);
 
     const int stepResult = sqlite3_step(statement);
+    std::string resolvedValue = defaultValue;
     if (stepResult == SQLITE_ROW) {
-      m_CachedSerialSettings.devicePath =
-          reinterpret_cast<const char*>(sqlite3_column_text(statement, 0));
-      m_CachedSerialSettings.baudRate = static_cast<std::uint32_t>(sqlite3_column_int64(statement, 1));
-      m_CachedSerialSettings.silenceTimeout =
-          std::chrono::milliseconds(static_cast<std::int64_t>(sqlite3_column_int64(statement, 2)));
-      m_CachedSerialSettings.readChunkSize = static_cast<std::size_t>(sqlite3_column_int64(statement, 3));
+      resolvedValue = reinterpret_cast<const char*>(sqlite3_column_text(statement, 0));
     } else if (stepResult != SQLITE_DONE) {
       sqlite3_finalize(statement);
-      throw std::runtime_error("Failed to read LptSettings row");
+      throw std::runtime_error("Failed to read LptSettings name/value row");
     }
 
     sqlite3_finalize(statement);
+    return resolvedValue;
   }
 
   void upsertCachedSerialSettings() const {
     static constexpr const char* upsertSql =
-        "INSERT INTO LptSettings (Id, DevicePath, BaudRate, SilenceTimeoutMs, ReadChunkSize) "
-        "VALUES (1, ?, ?, ?, ?) "
-        "ON CONFLICT(Id) DO UPDATE SET "
-        "DevicePath = excluded.DevicePath, "
-        "BaudRate = excluded.BaudRate, "
-        "SilenceTimeoutMs = excluded.SilenceTimeoutMs, "
-        "ReadChunkSize = excluded.ReadChunkSize;";
+        "INSERT INTO LptSettings (name, value) VALUES (?, ?) "
+        "ON CONFLICT(name) DO UPDATE SET value = excluded.value;";
 
     sqlite3_stmt* statement = nullptr;
     if (sqlite3_prepare_v2(m_DatabaseHandle, upsertSql, -1, &statement, nullptr) != SQLITE_OK) {
       throw std::runtime_error("Failed to prepare LptSettings upsert statement");
     }
 
-    sqlite3_bind_text(statement, 1, m_CachedSerialSettings.devicePath.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_int64(statement, 2, static_cast<sqlite3_int64>(m_CachedSerialSettings.baudRate));
-    sqlite3_bind_int64(statement, 3, static_cast<sqlite3_int64>(m_CachedSerialSettings.silenceTimeout.count()));
-    sqlite3_bind_int64(statement, 4, static_cast<sqlite3_int64>(m_CachedSerialSettings.readChunkSize));
+    persistSetting(statement, "devicePath", m_CachedSerialSettings.devicePath);
+    persistSetting(statement, "baudRate", std::to_string(m_CachedSerialSettings.baudRate));
+    persistSetting(statement, "silenceTimeoutMs", std::to_string(m_CachedSerialSettings.silenceTimeout.count()));
+    persistSetting(statement, "readChunkSize", std::to_string(m_CachedSerialSettings.readChunkSize));
+    finalizeStatement(statement);
+  }
 
-    if (sqlite3_step(statement) != SQLITE_DONE) {
-      sqlite3_finalize(statement);
-      throw std::runtime_error("Failed to write LptSettings row");
-    }
+  static void resetStatement(sqlite3_stmt* statement) {
+    sqlite3_reset(statement);
+    sqlite3_clear_bindings(statement);
+  }
 
+  static void finalizeStatement(sqlite3_stmt* statement) {
     sqlite3_finalize(statement);
+  }
+
+  void persistSetting(sqlite3_stmt* statement, const std::string& settingName, const std::string& settingValue) const {
+    resetStatement(statement);
+    sqlite3_bind_text(statement, 1, settingName.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(statement, 2, settingValue.c_str(), -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(statement) != SQLITE_DONE) {
+      finalizeStatement(statement);
+      throw std::runtime_error("Failed to write LptSettings name/value row");
+    }
   }
 
   void executeSql(const char* sqlText) const {
@@ -104,11 +123,15 @@ private:
     if (sqlite3_exec(m_DatabaseHandle, sqlText, nullptr, nullptr, &errorMessage) != SQLITE_OK) {
       const std::string sqliteError = (errorMessage != nullptr) ? errorMessage : "Unknown sqlite error";
       sqlite3_free(errorMessage);
+      if (m_Log) {
+        m_Log->Error("LptSettings schema initialization failed.");
+      }
       throw std::runtime_error(sqliteError);
     }
   }
 
   sqlite3* m_DatabaseHandle;
+  SharedLogger m_Log;
   mutable std::mutex m_Mutex;
   SerialSettings m_CachedSerialSettings{};
 };

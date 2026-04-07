@@ -3,11 +3,11 @@
 #include <atomic>
 #include <chrono>
 #include <exception>
-#include <iostream>
 #include <memory>
 #include <thread>
 
 #include "brake_tester/interfaces.hpp"
+#include "brake_tester/logging.hpp"
 
 namespace brake_tester {
 
@@ -16,11 +16,13 @@ public:
   LptManager(std::unique_ptr<ILptListener> listener,
              std::unique_ptr<IPrnPatcher> patcher,
              std::unique_ptr<IPrnRenderer> renderer,
-             std::unique_ptr<IRenderedDocumentWriter> writer)
+             std::unique_ptr<IRenderedDocumentWriter> writer,
+             SharedLogger log)
       : m_Listener(std::move(listener)),
         m_Patcher(std::move(patcher)),
         m_Renderer(std::move(renderer)),
-        m_Writer(std::move(writer)) {}
+        m_Writer(std::move(writer)),
+        m_Log(std::move(log)) {}
 
   ~LptManager() {
     stop();
@@ -44,8 +46,10 @@ public:
           auto renderedPages = m_Renderer->render(patchedBytes);
           m_Writer->writePages(renderedPages, "capture");
         } catch (const std::exception&) {
-          std::cerr << "[LptManager Error]: Failed to open serial device.\n";
-          std::cerr << "[LptManager Info]: Trying again in 10 seconds.\n";
+          if (m_Log) {
+            m_Log->Error("[LptManager Error]: Failed to open serial device.");
+            m_Log->information("[LptManager Info]: Trying again in 10 seconds.");
+          }
 
           constexpr auto retryWaitDuration = std::chrono::seconds(10);
           constexpr auto retryPollInterval = std::chrono::milliseconds(100);
@@ -77,6 +81,7 @@ private:
   std::unique_ptr<IPrnPatcher> m_Patcher;
   std::unique_ptr<IPrnRenderer> m_Renderer;
   std::unique_ptr<IRenderedDocumentWriter> m_Writer;
+  SharedLogger m_Log;
 };
 
 } // namespace brake_tester

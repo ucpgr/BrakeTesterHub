@@ -16,6 +16,7 @@
 #include <libserial/SerialPort.h>
 
 #include "brake_tester/interfaces.hpp"
+#include "brake_tester/logging.hpp"
 
 namespace brake_tester {
 
@@ -35,8 +36,8 @@ inline LibSerial::BaudRate toBaudRate(std::uint32_t baudRateValue) {
 
 class LptListener final : public ILptListener {
 public:
-  explicit LptListener(const ISettingsRepository& settingsRepository)
-      : m_SettingsRepository(settingsRepository) {}
+  LptListener(const ISettingsRepository& settingsRepository, SharedLogger log)
+      : m_SettingsRepository(settingsRepository), m_Log(std::move(log)) {}
 
   std::vector<std::uint8_t> captureTransmission() override {
     const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
@@ -45,6 +46,9 @@ public:
     transmissionBuffer.reserve(2048);
 
     LibSerial::SerialPort serialPort;
+    if (serialSettings.devicePath.empty() && m_Log) {
+      m_Log->Critical("Serial port path is empty");
+    }
     serialPort.Open(serialSettings.devicePath);
     serialPort.SetBaudRate(toBaudRate(serialSettings.baudRate));
 
@@ -75,14 +79,15 @@ public:
 
 private:
   const ISettingsRepository& m_SettingsRepository;
+  SharedLogger m_Log;
 };
 
 class PrnPatcher final : public IPrnPatcher {
 public:
   using PatchGenerator = std::function<std::string(const VehicleSelection&)>;
 
-  explicit PrnPatcher(const ISelectedVehicleStore& selectedVehicleStore)
-      : m_SelectedVehicleStore(selectedVehicleStore) {}
+  PrnPatcher(const ISelectedVehicleStore& selectedVehicleStore, SharedLogger log)
+      : m_SelectedVehicleStore(selectedVehicleStore), m_Log(std::move(log)) {}
 
   void addPatch(std::size_t patchOffset, PatchGenerator patchGenerator) {
     m_Patches.emplace_back(patchOffset, std::move(patchGenerator));
@@ -110,10 +115,13 @@ public:
 private:
   const ISelectedVehicleStore& m_SelectedVehicleStore;
   std::vector<std::pair<std::size_t, PatchGenerator>> m_Patches;
+  SharedLogger m_Log;
 };
 
 class PrnRenderer final : public IPrnRenderer {
 public:
+  explicit PrnRenderer(SharedLogger log) : m_Log(std::move(log)) {}
+
   std::vector<RenderedPage> render(const std::vector<std::uint8_t>& patchedBytes) override {
     RenderedPage renderedPage;
     renderedPage.pageIndex = 0;
@@ -122,12 +130,15 @@ public:
     renderedPage.pixels = patchedBytes;
     return {std::move(renderedPage)};
   }
+
+private:
+  SharedLogger m_Log;
 };
 
 class RenderedDocumentWriter final : public IRenderedDocumentWriter {
 public:
-  explicit RenderedDocumentWriter(std::filesystem::path outputDirectory)
-      : m_OutputDirectory(std::move(outputDirectory)) {}
+  RenderedDocumentWriter(std::filesystem::path outputDirectory, SharedLogger log)
+      : m_OutputDirectory(std::move(outputDirectory)), m_Log(std::move(log)) {}
 
   void writePages(const std::vector<RenderedPage>& pages, const std::string& documentId) override {
     std::filesystem::create_directories(m_OutputDirectory);
@@ -145,6 +156,7 @@ public:
 
 private:
   std::filesystem::path m_OutputDirectory;
+  SharedLogger m_Log;
 };
 
 } // namespace brake_tester
