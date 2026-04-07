@@ -37,8 +37,10 @@ inline LibSerial::BaudRate toBaudRate(std::uint32_t baudRateValue) {
 
 class LptListener final : public ILptListener {
 public:
-  LptListener(const ISettingsRepository& settingsRepository, SharedLogger log)
-      : m_SettingsRepository(settingsRepository), m_Log(std::move(log)) {}
+  LptListener(const ISettingsRepository& settingsRepository, ILptStore& lptStore, SharedLogger log)
+      : m_SettingsRepository(settingsRepository), m_LptStore(lptStore), m_Log(std::move(log)) {
+    m_LptStore.setListenerStatus(LptListenerStatus::Idle);
+  }
 
   ~LptListener() override {
     closeSerialPortIfOpen();
@@ -78,6 +80,7 @@ public:
                                  std::to_string(transmissionBuffer.size()) + ", elapsedMs: " +
                                  std::to_string(captureElapsedMilliseconds));
             }
+            m_LptStore.setListenerStatus(LptListenerStatus::Idle);
             return transmissionBuffer;
           }
 
@@ -110,6 +113,9 @@ public:
           captureStartTimestamp = std::chrono::steady_clock::now();
           m_Log->information("[LptListener Info]: Byte capture started.");
         }
+        if (!hasCapturedData) {
+          m_LptStore.setListenerStatus(LptListenerStatus::CaptureStarted);
+        }
         hasCapturedData = true;
         lastCapturedDataTimestamp = std::chrono::steady_clock::now();
         transmissionBuffer.reserve(transmissionBuffer.size() + bytesRead);
@@ -129,6 +135,7 @@ public:
                              std::to_string(transmissionBuffer.size()) + ", elapsedMs: " +
                              std::to_string(captureElapsedMilliseconds));
         }
+        m_LptStore.setListenerStatus(LptListenerStatus::Idle);
         return transmissionBuffer;
       }
 
@@ -148,6 +155,7 @@ public:
                          std::to_string(transmissionBuffer.size()) + ", elapsedMs: " +
                          std::to_string(captureElapsedMilliseconds));
     }
+    m_LptStore.setListenerStatus(LptListenerStatus::Idle);
     return {};
   }
 
@@ -210,6 +218,7 @@ private:
   }
 
   const ISettingsRepository& m_SettingsRepository;
+  ILptStore& m_LptStore;
   SharedLogger m_Log;
   LibSerial::SerialPort m_SerialPort;
   bool m_IsSerialPortOpen{false};
@@ -299,6 +308,37 @@ public:
 
 private:
   std::filesystem::path m_OutputDirectory;
+  SharedLogger m_Log;
+};
+
+class PrnWriter final : public IPrnWriter {
+public:
+  PrnWriter(std::filesystem::path rootDirectory, SharedLogger log)
+      : m_RootDirectory(std::move(rootDirectory)), m_Log(std::move(log)) {}
+
+  void writePrn(const std::vector<std::uint8_t>& patchedBytes, const std::string& filenameWithoutExtension) override {
+    if (filenameWithoutExtension.empty()) {
+      if (m_Log) {
+        m_Log->warning("[PrnWriter Warning]: No filename provided for prn output.");
+      }
+      return;
+    }
+
+    std::filesystem::path relativePath(filenameWithoutExtension);
+    relativePath += ".prn";
+    const auto fullPath = m_RootDirectory / relativePath;
+    std::filesystem::create_directories(fullPath.parent_path());
+
+    std::ofstream outputStream(fullPath, std::ios::binary);
+    outputStream.write(reinterpret_cast<const char*>(patchedBytes.data()),
+                       static_cast<std::streamsize>(patchedBytes.size()));
+    if (m_Log) {
+      m_Log->information("[PrnWriter Info]: Wrote prn file to " + fullPath.string());
+    }
+  }
+
+private:
+  std::filesystem::path m_RootDirectory;
   SharedLogger m_Log;
 };
 
