@@ -59,7 +59,36 @@ public:
 
     while (shouldKeepRunning) {
       LibSerial::DataBuffer chunkBuffer;
-      m_SerialPort.Read(chunkBuffer, serialSettings.readChunkSize, serialSettings.silenceTimeout.count());
+      try {
+        m_SerialPort.Read(chunkBuffer, serialSettings.readChunkSize, serialSettings.silenceTimeout.count());
+      } catch (const std::exception& readException) {
+        const std::string readErrorReason = readException.what();
+        const bool isReadTimeout =
+            (readErrorReason.find("timeout") != std::string::npos || readErrorReason.find("Timeout") != std::string::npos);
+
+        if (isReadTimeout) {
+          if (!m_SerialPort.IsOpen()) {
+            m_IsSerialPortOpen = false;
+            if (m_Log) {
+              m_Log->warning("[LptListener Warning]: Serial port closed during read timeout. Reopening.");
+            }
+            ensureSerialPortOpen(serialSettings);
+          }
+          continue;
+        }
+
+        if (!m_SerialPort.IsOpen()) {
+          m_IsSerialPortOpen = false;
+          if (m_Log) {
+            m_Log->warning("[LptListener Warning]: Serial port closed during read. Reopening.");
+          }
+          ensureSerialPortOpen(serialSettings);
+          continue;
+        }
+
+        throw std::runtime_error("[LptManager Error]: Serial read failed on device '" + serialSettings.devicePath +
+                                 "'. Reason: " + readErrorReason);
+      }
       const std::size_t bytesRead = chunkBuffer.size();
 
       if (bytesRead > 0) {
