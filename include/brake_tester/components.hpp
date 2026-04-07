@@ -46,10 +46,6 @@ public:
 
   std::vector<std::uint8_t> captureTransmission(const std::atomic_bool& shouldKeepRunning) override {
     const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
-    if (m_Log) {
-      m_Log->information("[LptListener Info]: Starting transmission capture cycle.");
-    }
-
     std::vector<std::uint8_t> transmissionBuffer;
     transmissionBuffer.reserve(2048);
 
@@ -58,20 +54,35 @@ public:
     }
     ensureSerialPortOpen(serialSettings);
 
+    bool hasCapturedData = false;
+    auto lastCapturedDataTimestamp = std::chrono::steady_clock::now();
+
     while (shouldKeepRunning) {
       LibSerial::DataBuffer chunkBuffer;
       m_SerialPort.Read(chunkBuffer, serialSettings.readChunkSize, serialSettings.silenceTimeout.count());
       const std::size_t bytesRead = chunkBuffer.size();
 
       if (bytesRead > 0) {
+        hasCapturedData = true;
+        lastCapturedDataTimestamp = std::chrono::steady_clock::now();
         transmissionBuffer.reserve(transmissionBuffer.size() + bytesRead);
         for (std::size_t chunkByteIndex = 0; chunkByteIndex < bytesRead; ++chunkByteIndex) {
           transmissionBuffer.push_back(static_cast<std::uint8_t>(chunkBuffer[chunkByteIndex]));
         }
-        if (m_Log) {
-          m_Log->information("[LptListener Info]: Captured " + std::to_string(bytesRead) + " bytes from serial device.");
-        }
+        continue;
+      }
+
+      if (hasCapturedData &&
+          (std::chrono::steady_clock::now() - lastCapturedDataTimestamp) >= serialSettings.silenceTimeout) {
         return transmissionBuffer;
+      }
+
+      if (!m_SerialPort.IsOpen()) {
+        m_IsSerialPortOpen = false;
+        if (m_Log) {
+          m_Log->warning("[LptListener Warning]: Serial port is no longer open. Reopening.");
+        }
+        ensureSerialPortOpen(serialSettings);
       }
     }
     return {};
