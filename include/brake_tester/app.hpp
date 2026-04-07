@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
+#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -10,29 +12,34 @@
 
 #include "brake_tester/components.hpp"
 #include "brake_tester/lpt_manager.hpp"
+#include "brake_tester/logging.hpp"
 #include "brake_tester/repositories.hpp"
 
 namespace brake_tester {
 
 class App {
 public:
-  explicit App(std::string database_path) {
-    if (sqlite3_open(database_path.c_str(), &db_) != SQLITE_OK) {
+  explicit App(std::string databasePath) {
+    m_Log = std::make_shared<Logger>(LogVerbosity::Information);
+    m_Log->information("[App Info]: Initializing application.");
+
+    if (sqlite3_open(databasePath.c_str(), &m_DatabaseHandle) != SQLITE_OK) {
       throw std::runtime_error("Failed to open sqlite database");
     }
+    m_Log->information("[App Info]: Opened sqlite database at path: " + databasePath);
 
-    settings_repository_ = std::make_unique<SettingsRepository>(db_);
-    selected_vehicle_store_ = std::make_unique<SelectedVehicleStore>(db_);
+    m_SettingsRepository = std::make_unique<SettingsRepository>(m_DatabaseHandle, m_Log);
+    m_SelectedVehicleStore = std::make_unique<SelectedVehicleStore>();
 
-    auto listener = std::make_unique<LptListener>(*settings_repository_);
-    auto patcher = std::make_unique<PrnPatcher>(*selected_vehicle_store_);
+    auto listener = std::make_unique<LptListener>(*m_SettingsRepository, m_Log);
+    auto patcher = std::make_unique<PrnPatcher>(*m_SelectedVehicleStore, m_Log);
     patcher->addPatch(0x45F, [](const VehicleSelection&) { return std::string("patched"); });
 
-    auto renderer = std::make_unique<PrnRenderer>();
-    auto writer = std::make_unique<RenderedDocumentWriter>("output");
+    auto renderer = std::make_unique<PrnRenderer>(m_Log);
+    auto writer = std::make_unique<RenderedDocumentWriter>("output", m_Log);
 
-    lpt_manager_ = std::make_unique<LptManager>(
-        std::move(listener), std::move(patcher), std::move(renderer), std::move(writer));
+    m_LptManager = std::make_unique<LptManager>(
+        std::move(listener), std::move(patcher), std::move(renderer), std::move(writer), m_Log);
   }
 
   ~App() {
@@ -40,28 +47,59 @@ public:
   }
 
   void run() {
-    lpt_manager_->start();
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    lpt_manager_->stop();
+    m_Log->information("[App Info]: Starting application runtime.");
+    m_LptManager->start();
+    startInputListener();
   }
 
   void shutdown() {
-    if (lpt_manager_) {
-      lpt_manager_->stop();
+    m_IsInputListening = false;
+    if (m_Log) {
+      m_Log->information("[App Info]: Shutting down application.");
+    }
+    if (m_LptManager) {
+      m_LptManager->stop();
     }
 
-    if (db_ != nullptr) {
-      sqlite3_close(db_);
-      db_ = nullptr;
+    if (m_DatabaseHandle != nullptr) {
+      sqlite3_close(m_DatabaseHandle);
+      m_DatabaseHandle = nullptr;
     }
   }
 
 private:
-  sqlite3* db_{nullptr};
+  void startInputListener() {
+    if (m_IsInputListening.exchange(true)) {
+      return;
+    }
 
-  std::unique_ptr<SettingsRepository> settings_repository_;
-  std::unique_ptr<SelectedVehicleStore> selected_vehicle_store_;
-  std::unique_ptr<LptManager> lpt_manager_;
+    std::thread([this]() {
+      if (m_Log) {
+        m_Log->information("[App Info]: Type 't' then Enter to send a test byte.");
+      }
+
+      std::string consoleInput;
+      while (m_IsInputListening) {
+        if (!std::getline(std::cin, consoleInput)) {
+          std::cin.clear();
+          std::this_thread::sleep_for(std::chrono::milliseconds(100));
+          continue;
+        }
+
+        if (consoleInput == "t") {
+          m_LptManager->sendTestSignal();
+        }
+      }
+    }).detach();
+  }
+
+  std::atomic_bool m_IsInputListening{false};
+  SharedLogger m_Log;
+  sqlite3* m_DatabaseHandle{nullptr};
+
+  std::unique_ptr<SettingsRepository> m_SettingsRepository;
+  std::unique_ptr<SelectedVehicleStore> m_SelectedVehicleStore;
+  std::unique_ptr<LptManager> m_LptManager;
 };
 
 } // namespace brake_tester
