@@ -6,7 +6,6 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <thread>
 
 #include <sqlite3.h>
 
