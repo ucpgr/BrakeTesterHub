@@ -2,6 +2,8 @@
 
 #include <atomic>
 #include <chrono>
+#include <exception>
+#include <iostream>
 #include <memory>
 #include <thread>
 
@@ -31,15 +33,28 @@ public:
 
     m_WorkerThread = std::thread([this] {
       while (m_IsRunning) {
-        auto incomingBytes = m_Listener->captureTransmission();
-        if (incomingBytes.empty()) {
-          std::this_thread::sleep_for(std::chrono::milliseconds(100));
-          continue;
-        }
+        try {
+          auto incomingBytes = m_Listener->captureTransmission();
+          if (incomingBytes.empty()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+          }
 
-        auto patchedBytes = m_Patcher->patch(incomingBytes);
-        auto renderedPages = m_Renderer->render(patchedBytes);
-        m_Writer->writePages(renderedPages, "capture");
+          auto patchedBytes = m_Patcher->patch(incomingBytes);
+          auto renderedPages = m_Renderer->render(patchedBytes);
+          m_Writer->writePages(renderedPages, "capture");
+        } catch (const std::exception&) {
+          std::cerr << "[LptManager Error]: Failed to open serial device.\n";
+          std::cerr << "[LptManager Info]: Trying again in 10 seconds.\n";
+
+          constexpr auto retryWaitDuration = std::chrono::seconds(10);
+          constexpr auto retryPollInterval = std::chrono::milliseconds(100);
+          auto waitedDuration = std::chrono::milliseconds(0);
+          while (m_IsRunning && waitedDuration < retryWaitDuration) {
+            std::this_thread::sleep_for(retryPollInterval);
+            waitedDuration += retryPollInterval;
+          }
+        }
       }
     });
   }
