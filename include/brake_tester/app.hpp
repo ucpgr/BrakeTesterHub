@@ -29,16 +29,24 @@ public:
 
     m_SettingsRepository = std::make_unique<SettingsRepository>(m_DatabaseHandle, m_Log);
     m_SelectedVehicleStore = std::make_unique<SelectedVehicleStore>();
+    m_LptStore = std::make_unique<LptStore>();
 
-    auto listener = std::make_unique<LptListener>(*m_SettingsRepository, m_Log);
+    auto listener = std::make_unique<LptListener>(*m_SettingsRepository, *m_LptStore, m_Log);
     auto patcher = std::make_unique<PrnPatcher>(*m_SelectedVehicleStore, m_Log);
     patcher->addPatch(0x45F, [](const VehicleSelection&) { return std::string("patched"); });
 
     auto renderer = std::make_unique<PrnRenderer>(m_Log);
     auto writer = std::make_unique<RenderedDocumentWriter>("output", m_Log);
+    auto prnWriter = std::make_unique<PrnWriter>(".", m_Log);
 
-    m_LptManager = std::make_unique<LptManager>(
-        std::move(listener), std::move(patcher), std::move(renderer), std::move(writer), *m_SettingsRepository, m_Log);
+    m_LptManager = std::make_unique<LptManager>(std::move(listener),
+                                                std::move(patcher),
+                                                std::move(renderer),
+                                                std::move(writer),
+                                                std::move(prnWriter),
+                                                *m_LptStore,
+                                                *m_SettingsRepository,
+                                                m_Log);
   }
 
   ~App() {
@@ -98,6 +106,7 @@ private:
 
   std::unique_ptr<SettingsRepository> m_SettingsRepository;
   std::unique_ptr<SelectedVehicleStore> m_SelectedVehicleStore;
+  std::unique_ptr<LptStore> m_LptStore;
   std::unique_ptr<LptManager> m_LptManager;
 };
 
