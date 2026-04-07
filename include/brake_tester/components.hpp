@@ -71,23 +71,19 @@ public:
           "[LptManager Error]: Failed to open serial device '" + serialSettings.devicePath + "'. Reason: " + errorReason);
     }
 
-    bool hasSeenData = false;
-    auto lastDataTimestamp = std::chrono::steady_clock::now();
-
     while (true) {
       LibSerial::DataBuffer chunkBuffer;
-      serialPort.Read(chunkBuffer, serialSettings.readChunkSize, 25);
+      serialPort.Read(chunkBuffer, serialSettings.readChunkSize, 0);
       const std::size_t bytesRead = chunkBuffer.size();
 
       if (bytesRead > 0) {
-        hasSeenData = true;
-        lastDataTimestamp = std::chrono::steady_clock::now();
         transmissionBuffer.reserve(transmissionBuffer.size() + bytesRead);
         for (std::size_t chunkByteIndex = 0; chunkByteIndex < bytesRead; ++chunkByteIndex) {
           transmissionBuffer.push_back(static_cast<std::uint8_t>(chunkBuffer[chunkByteIndex]));
         }
-      } else if (hasSeenData &&
-                 (std::chrono::steady_clock::now() - lastDataTimestamp) >= serialSettings.silenceTimeout) {
+        if (m_Log) {
+          m_Log->information("[LptListener Info]: Captured " + std::to_string(bytesRead) + " bytes from serial device.");
+        }
         break;
       }
     }
