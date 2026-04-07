@@ -117,6 +117,22 @@ public:
     return {};
   }
 
+  void test() override {
+    const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
+    ensureSerialPortOpen(serialSettings);
+
+    try {
+      const char testByte = 't';
+      m_SerialPort.WriteByte(testByte);
+      if (m_Log) {
+        m_Log->information("[LptListener Info]: Wrote test byte 't' to serial port.");
+      }
+    } catch (const std::exception& writeException) {
+      throw std::runtime_error("[LptManager Error]: Failed to write test byte to serial device '" +
+                               serialSettings.devicePath + "'. Reason: " + writeException.what());
+    }
+  }
+
 private:
   void ensureSerialPortOpen(const SerialSettings& serialSettings) {
     const bool shouldReopenPort = (!m_IsSerialPortOpen || m_OpenDevicePath != serialSettings.devicePath);

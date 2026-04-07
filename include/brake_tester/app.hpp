@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
+#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -46,9 +48,11 @@ public:
   void run() {
     m_Log->information("[App Info]: Starting application runtime.");
     m_LptManager->start();
+    startInputListener();
   }
 
   void shutdown() {
+    m_IsInputListening = false;
     if (m_Log) {
       m_Log->information("[App Info]: Shutting down application.");
     }
@@ -63,6 +67,32 @@ public:
   }
 
 private:
+  void startInputListener() {
+    if (m_IsInputListening.exchange(true)) {
+      return;
+    }
+
+    std::thread([this]() {
+      if (m_Log) {
+        m_Log->information("[App Info]: Type 't' then Enter to send a test byte.");
+      }
+
+      std::string consoleInput;
+      while (m_IsInputListening) {
+        if (!std::getline(std::cin, consoleInput)) {
+          std::cin.clear();
+          std::this_thread::sleep_for(std::chrono::milliseconds(100));
+          continue;
+        }
+
+        if (consoleInput == "t") {
+          m_LptManager->sendTestSignal();
+        }
+      }
+    }).detach();
+  }
+
+  std::atomic_bool m_IsInputListening{false};
   SharedLogger m_Log;
   sqlite3* m_DatabaseHandle{nullptr};
 

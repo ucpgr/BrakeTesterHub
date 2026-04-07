@@ -79,6 +79,16 @@ public:
     }
   }
 
+  void sendTestSignal() {
+    try {
+      m_Listener->test();
+    } catch (const std::exception& testException) {
+      if (m_Log) {
+        m_Log->Error(testException.what());
+      }
+    }
+  }
+
 private:
   std::atomic_bool m_IsRunning{false};
   std::thread m_WorkerThread;
