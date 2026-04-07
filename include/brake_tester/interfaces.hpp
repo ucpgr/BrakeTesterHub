@@ -23,6 +23,15 @@ public:
   virtual void setSelectedVehicle(const VehicleSelection& selectedVehicle) = 0;
 };
 
+class ILptStore {
+public:
+  virtual ~ILptStore() = default;
+  virtual LptListenerStatus getListenerStatus() const = 0;
+  virtual void setListenerStatus(LptListenerStatus status) = 0;
+  virtual std::string getCurrentCaptureFilename() const = 0;
+  virtual void setCurrentCaptureFilename(std::string filename) = 0;
+};
+
 class ILptListener {
 public:
   virtual ~ILptListener() = default;
@@ -46,6 +55,12 @@ class IRenderedDocumentWriter {
 public:
   virtual ~IRenderedDocumentWriter() = default;
   virtual void writePages(const std::vector<RenderedPage>& pages, const std::string& document_id) = 0;
+};
+
+class IPrnWriter {
+public:
+  virtual ~IPrnWriter() = default;
+  virtual void writePrn(const std::vector<std::uint8_t>& patchedBytes, const std::string& filenameWithoutExtension) = 0;
 };
 
 } // namespace brake_tester
