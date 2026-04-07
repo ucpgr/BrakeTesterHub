@@ -55,6 +55,7 @@ public:
     ensureSerialPortOpen(serialSettings);
 
     bool hasCapturedData = false;
+    auto captureStartTimestamp = std::chrono::steady_clock::now();
     auto lastCapturedDataTimestamp = std::chrono::steady_clock::now();
 
     while (shouldKeepRunning) {
@@ -92,6 +93,10 @@ public:
       const std::size_t bytesRead = chunkBuffer.size();
 
       if (bytesRead > 0) {
+        if (!hasCapturedData && m_Log) {
+          captureStartTimestamp = std::chrono::steady_clock::now();
+          m_Log->information("[LptListener Info]: Byte capture started.");
+        }
         hasCapturedData = true;
         lastCapturedDataTimestamp = std::chrono::steady_clock::now();
         transmissionBuffer.reserve(transmissionBuffer.size() + bytesRead);
@@ -103,6 +108,14 @@ public:
 
       if (hasCapturedData &&
           (std::chrono::steady_clock::now() - lastCapturedDataTimestamp) >= serialSettings.silenceTimeout) {
+        if (m_Log) {
+          const auto captureElapsedMilliseconds =
+              std::chrono::duration_cast<std::chrono::milliseconds>(lastCapturedDataTimestamp - captureStartTimestamp)
+                  .count();
+          m_Log->information("[LptListener Info]: Byte capture ended. Total bytes: " +
+                             std::to_string(transmissionBuffer.size()) + ", elapsedMs: " +
+                             std::to_string(captureElapsedMilliseconds));
+        }
         return transmissionBuffer;
       }
 
@@ -113,6 +126,14 @@ public:
         }
         ensureSerialPortOpen(serialSettings);
       }
+    }
+    if (hasCapturedData && m_Log) {
+      const auto captureElapsedMilliseconds =
+          std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - captureStartTimestamp)
+              .count();
+      m_Log->information("[LptListener Info]: Byte capture ended due to stop. Total bytes: " +
+                         std::to_string(transmissionBuffer.size()) + ", elapsedMs: " +
+                         std::to_string(captureElapsedMilliseconds));
     }
     return {};
   }
