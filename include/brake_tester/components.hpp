@@ -68,6 +68,19 @@ public:
             (readErrorReason.find("timeout") != std::string::npos || readErrorReason.find("Timeout") != std::string::npos);
 
         if (isReadTimeout) {
+          if (hasCapturedData &&
+              (std::chrono::steady_clock::now() - lastCapturedDataTimestamp) >= serialSettings.silenceTimeout) {
+            if (m_Log) {
+              const auto captureElapsedMilliseconds =
+                  std::chrono::duration_cast<std::chrono::milliseconds>(lastCapturedDataTimestamp - captureStartTimestamp)
+                      .count();
+              m_Log->information("[LptListener Info]: Byte capture ended. Total bytes: " +
+                                 std::to_string(transmissionBuffer.size()) + ", elapsedMs: " +
+                                 std::to_string(captureElapsedMilliseconds));
+            }
+            return transmissionBuffer;
+          }
+
           if (!m_SerialPort.IsOpen()) {
             m_IsSerialPortOpen = false;
             if (m_Log) {

@@ -38,7 +38,7 @@ public:
     auto writer = std::make_unique<RenderedDocumentWriter>("output", m_Log);
 
     m_LptManager = std::make_unique<LptManager>(
-        std::move(listener), std::move(patcher), std::move(renderer), std::move(writer), m_Log);
+        std::move(listener), std::move(patcher), std::move(renderer), std::move(writer), *m_SettingsRepository, m_Log);
   }
 
   ~App() {

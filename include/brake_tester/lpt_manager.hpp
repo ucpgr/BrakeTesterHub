@@ -17,11 +17,13 @@ public:
              std::unique_ptr<IPrnPatcher> patcher,
              std::unique_ptr<IPrnRenderer> renderer,
              std::unique_ptr<IRenderedDocumentWriter> writer,
+             const ISettingsRepository& settingsRepository,
              SharedLogger log)
       : m_Listener(std::move(listener)),
         m_Patcher(std::move(patcher)),
         m_Renderer(std::move(renderer)),
         m_Writer(std::move(writer)),
+        m_SettingsRepository(settingsRepository),
         m_Log(std::move(log)) {}
 
   ~LptManager() {
@@ -33,7 +35,12 @@ public:
       return;
     }
     if (m_Log) {
+      const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
       m_Log->information("[LptManager Info]: Starting worker thread.");
+      m_Log->information("[LptManager Info]: Serial settings -> devicePath=" + serialSettings.devicePath +
+                         ", baudRate=" + std::to_string(serialSettings.baudRate) + ", readChunkSize=" +
+                         std::to_string(serialSettings.readChunkSize) + ", silenceTimeoutMs=" +
+                         std::to_string(serialSettings.silenceTimeout.count()));
     }
 
     m_WorkerThread = std::thread([this] {
@@ -97,6 +104,7 @@ private:
   std::unique_ptr<IPrnPatcher> m_Patcher;
   std::unique_ptr<IPrnRenderer> m_Renderer;
   std::unique_ptr<IRenderedDocumentWriter> m_Writer;
+  const ISettingsRepository& m_SettingsRepository;
   SharedLogger m_Log;
 };
 
