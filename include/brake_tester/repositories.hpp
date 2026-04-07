@@ -5,6 +5,7 @@
 #include <mutex>
 #include <string>
 #include <stdexcept>
+#include <utility>
 
 #include <sqlite3.h>
 
@@ -162,6 +163,36 @@ public:
 private:
   mutable std::mutex m_Mutex;
   VehicleSelection m_SelectedVehicle{};
+};
+
+class LptStore final : public ILptStore {
+public:
+  LptStore() = default;
+
+  LptListenerStatus getListenerStatus() const override {
+    std::scoped_lock lock(m_Mutex);
+    return m_ListenerStatus;
+  }
+
+  void setListenerStatus(LptListenerStatus status) override {
+    std::scoped_lock lock(m_Mutex);
+    m_ListenerStatus = status;
+  }
+
+  std::string getCurrentCaptureFilename() const override {
+    std::scoped_lock lock(m_Mutex);
+    return m_CurrentCaptureFilename;
+  }
+
+  void setCurrentCaptureFilename(std::string filename) override {
+    std::scoped_lock lock(m_Mutex);
+    m_CurrentCaptureFilename = std::move(filename);
+  }
+
+private:
+  mutable std::mutex m_Mutex;
+  LptListenerStatus m_ListenerStatus{LptListenerStatus::Idle};
+  std::string m_CurrentCaptureFilename;
 };
 
 } // namespace brake_tester

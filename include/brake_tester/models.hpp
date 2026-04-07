@@ -27,4 +27,9 @@ struct RenderedPage {
   std::size_t height{ 0 };
 };
 
+enum class LptListenerStatus {
+  Idle,
+  CaptureStarted
+};
+
 } // namespace brake_tester
