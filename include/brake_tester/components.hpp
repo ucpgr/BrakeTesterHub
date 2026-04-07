@@ -49,7 +49,7 @@ public:
   std::vector<std::uint8_t> captureTransmission(const std::atomic_bool& shouldKeepRunning) override {
     const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
     const auto endOfTransmissionSilenceTimeout =
-        std::max(serialSettings.silenceTimeout * 4, std::chrono::milliseconds(1000));
+        std::max(serialSettings.silenceTimeout * 20, std::chrono::milliseconds(5000));
     std::vector<std::uint8_t> transmissionBuffer;
     transmissionBuffer.reserve(2048);
 
@@ -63,9 +63,13 @@ public:
     auto lastCapturedDataTimestamp = std::chrono::steady_clock::now();
 
     while (shouldKeepRunning) {
-      LibSerial::DataBuffer chunkBuffer;
+      std::uint8_t capturedByte = 0;
+      bool didReadByte = false;
       try {
-        m_SerialPort.Read(chunkBuffer, serialSettings.readChunkSize, serialSettings.silenceTimeout.count());
+        char readByte = '\0';
+        m_SerialPort.ReadByte(readByte, serialSettings.silenceTimeout.count());
+        capturedByte = static_cast<std::uint8_t>(readByte);
+        didReadByte = true;
       } catch (const std::exception& readException) {
         const std::string readErrorReason = readException.what();
         const bool isReadTimeout =
@@ -109,7 +113,7 @@ public:
         throw std::runtime_error("[LptManager Error]: Serial read failed on device '" + serialSettings.devicePath +
                                  "'. Reason: " + readErrorReason);
       }
-      const std::size_t bytesRead = chunkBuffer.size();
+      const std::size_t bytesRead = didReadByte ? 1 : 0;
 
       if (bytesRead > 0) {
         if (!hasCapturedData && m_Log) {
@@ -122,9 +126,7 @@ public:
         hasCapturedData = true;
         lastCapturedDataTimestamp = std::chrono::steady_clock::now();
         transmissionBuffer.reserve(transmissionBuffer.size() + bytesRead);
-        for (std::size_t chunkByteIndex = 0; chunkByteIndex < bytesRead; ++chunkByteIndex) {
-          transmissionBuffer.push_back(static_cast<std::uint8_t>(chunkBuffer[chunkByteIndex]));
-        }
+        transmissionBuffer.push_back(capturedByte);
         continue;
       }
 
