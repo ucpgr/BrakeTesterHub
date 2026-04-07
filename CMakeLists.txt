@@ -20,7 +20,7 @@ find_package(Threads REQUIRED)
 # -------------------------------------------------
 FetchContent_Declare(
     cpp_httplib
-    GIT_REPOSITORY git@github.com:yhirose/cpp-httplib.git
+    GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
     GIT_TAG        v0.35.0
 )
 
@@ -31,7 +31,7 @@ FetchContent_MakeAvailable(cpp_httplib)
 # -------------------------------------------------
 FetchContent_Declare(
     sqlite3
-    GIT_REPOSITORY git@github.com:sqlite/sqlite.git
+    GIT_REPOSITORY https://github.com/sqlite/sqlite.git
     GIT_TAG        version-3.45.1
 )
 
@@ -45,7 +45,7 @@ set(SQLITE3_LIB sqlite3)
 # -------------------------------------------------
 FetchContent_Declare(
     sqlite_orm
-    GIT_REPOSITORY git@github.com:fnc12/sqlite_orm.git
+    GIT_REPOSITORY https://github.com/fnc12/sqlite_orm.git
     GIT_TAG        v1.9.1
 )
 
@@ -63,7 +63,7 @@ set(LIBSERIAL_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
     libserial
-    GIT_REPOSITORY git@github.com:crayzeewulf/libserial.git
+    GIT_REPOSITORY https://github.com/crayzeewulf/libserial.git
     GIT_TAG        master
 )
 
@@ -87,7 +87,7 @@ target_include_directories(BrakeTesterHub PRIVATE
     include
     ${cpp_httplib_SOURCE_DIR}
     ${sqlite_orm_SOURCE_DIR}/include
-    ${libserial_SOURCE_DIR}/
+    ${libserial_SOURCE_DIR}/src
     ${sqlite3_SOURCE_DIR}
 )
 
@@ -96,7 +96,7 @@ target_include_directories(BrakeTesterHub PRIVATE
 # -------------------------------------------------
 target_link_libraries(BrakeTesterHub PRIVATE
     ${SQLITE3_LIB}
-    serial
+    libserial_static
     Threads::Threads
 )
 
