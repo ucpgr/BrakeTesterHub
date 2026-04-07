@@ -2,6 +2,8 @@
 
 #include <atomic>
 #include <chrono>
+#include <exception>
+#include <iostream>
 #include <memory>
 #include <thread>
 
@@ -15,53 +17,66 @@ public:
              std::unique_ptr<IPrnPatcher> patcher,
              std::unique_ptr<IPrnRenderer> renderer,
              std::unique_ptr<IRenderedDocumentWriter> writer)
-      : listener_(std::move(listener)),
-        patcher_(std::move(patcher)),
-        renderer_(std::move(renderer)),
-        writer_(std::move(writer)) {}
+      : m_Listener(std::move(listener)),
+        m_Patcher(std::move(patcher)),
+        m_Renderer(std::move(renderer)),
+        m_Writer(std::move(writer)) {}
 
   ~LptManager() {
     stop();
   }
 
   void start() {
-    if (running_.exchange(true)) {
+    if (m_IsRunning.exchange(true)) {
       return;
     }
 
-    worker_ = std::thread([this] {
-      while (running_) {
-        auto incoming_bytes = listener_->captureTransmission();
-        if (incoming_bytes.empty()) {
-          std::this_thread::sleep_for(std::chrono::milliseconds(100));
-          continue;
-        }
+    m_WorkerThread = std::thread([this] {
+      while (m_IsRunning) {
+        try {
+          auto incomingBytes = m_Listener->captureTransmission();
+          if (incomingBytes.empty()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+          }
 
-        auto patched = patcher_->patch(incoming_bytes);
-        auto pages = renderer_->render(patched);
-        writer_->writePages(pages, "capture");
+          auto patchedBytes = m_Patcher->patch(incomingBytes);
+          auto renderedPages = m_Renderer->render(patchedBytes);
+          m_Writer->writePages(renderedPages, "capture");
+        } catch (const std::exception&) {
+          std::cerr << "[LptManager Error]: Failed to open serial device.\n";
+          std::cerr << "[LptManager Info]: Trying again in 10 seconds.\n";
+
+          constexpr auto retryWaitDuration = std::chrono::seconds(10);
+          constexpr auto retryPollInterval = std::chrono::milliseconds(100);
+          auto waitedDuration = std::chrono::milliseconds(0);
+          while (m_IsRunning && waitedDuration < retryWaitDuration) {
+            std::this_thread::sleep_for(retryPollInterval);
+            waitedDuration += retryPollInterval;
+          }
+        }
       }
     });
   }
 
   void stop() {
-    if (!running_.exchange(false)) {
+    if (!m_IsRunning.exchange(false)) {
       return;
     }
 
-    if (worker_.joinable()) {
-      worker_.join();
+    if (m_WorkerThread.joinable()) {
+      m_WorkerThread.join();
     }
   }
 
 private:
-  std::atomic_bool running_{false};
-  std::thread worker_;
+  std::atomic_bool m_IsRunning{false};
+  std::thread m_WorkerThread;
 
-  std::unique_ptr<ILptListener> listener_;
-  std::unique_ptr<IPrnPatcher> patcher_;
-  std::unique_ptr<IPrnRenderer> renderer_;
-  std::unique_ptr<IRenderedDocumentWriter> writer_;
+  std::unique_ptr<ILptListener> m_Listener;
+  std::unique_ptr<IPrnPatcher> m_Patcher;
+  std::unique_ptr<IPrnRenderer> m_Renderer;
+  std::unique_ptr<IRenderedDocumentWriter> m_Writer;
 };
 
 } // namespace brake_tester
