@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -12,20 +13,20 @@ class ISettingsRepository {
 public:
   virtual ~ISettingsRepository() = default;
   virtual SerialSettings getSerialSettings() const = 0;
-  virtual void setSerialSettings(const SerialSettings& settings) = 0;
+  virtual void setSerialSettings(const SerialSettings& serialSettings) = 0;
 };
 
 class ISelectedVehicleStore {
 public:
   virtual ~ISelectedVehicleStore() = default;
   virtual VehicleSelection getSelectedVehicle() const = 0;
-  virtual void setSelectedVehicle(const VehicleSelection& selected_vehicle) = 0;
+  virtual void setSelectedVehicle(const VehicleSelection& selectedVehicle) = 0;
 };
 
 class ILptListener {
 public:
   virtual ~ILptListener() = default;
-  virtual std::vector<std::uint8_t> captureTransmission() = 0;
+  virtual std::vector<std::uint8_t> captureTransmission(const std::atomic_bool& shouldKeepRunning) = 0;
 };
 
 class IPrnPatcher {
