@@ -8,6 +8,7 @@
 #include <fstream>
 #include <functional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <utility>
@@ -16,11 +17,12 @@
 #include <libserial/SerialPort.h>
 
 #include "brake_tester/interfaces.hpp"
+#include "brake_tester/logging.hpp"
 
 namespace brake_tester {
 
-inline LibSerial::BaudRate toBaudRate(std::uint32_t baud_rate) {
-  switch (baud_rate) {
+inline LibSerial::BaudRate toBaudRate(std::uint32_t baudRateValue) {
+  switch (baudRateValue) {
     case 1200: return LibSerial::BaudRate::BAUD_1200;
     case 2400: return LibSerial::BaudRate::BAUD_2400;
     case 4800: return LibSerial::BaudRate::BAUD_4800;
@@ -35,112 +37,190 @@ inline LibSerial::BaudRate toBaudRate(std::uint32_t baud_rate) {
 
 class LptListener final : public ILptListener {
 public:
-  explicit LptListener(const ISettingsRepository& settings_repository)
-      : settings_repository_(settings_repository) {}
+  LptListener(const ISettingsRepository& settingsRepository, SharedLogger log)
+      : m_SettingsRepository(settingsRepository), m_Log(std::move(log)) {}
 
-  std::vector<std::uint8_t> captureTransmission() override {
-    const SerialSettings settings = settings_repository_.getSerialSettings();
+  ~LptListener() override {
+    closeSerialPortIfOpen();
+  }
 
-    std::vector<std::uint8_t> buffer;
-    buffer.reserve(2048);
+  std::vector<std::uint8_t> captureTransmission(const std::atomic_bool& shouldKeepRunning) override {
+    const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
+    std::vector<std::uint8_t> transmissionBuffer;
+    transmissionBuffer.reserve(2048);
 
-    LibSerial::SerialPort serial_port;
-    serial_port.Open(settings.device_path);
-    serial_port.SetBaudRate(toBaudRate(settings.baud_rate));
+    if (serialSettings.devicePath.empty() && m_Log) {
+      m_Log->Critical("Serial port path is empty");
+    }
+    ensureSerialPortOpen(serialSettings);
 
-    bool seen_data = false;
-    auto last_data_time = std::chrono::steady_clock::now();
+    bool hasCapturedData = false;
+    auto lastCapturedDataTimestamp = std::chrono::steady_clock::now();
 
-    while (true) {
-      std::vector<std::uint8_t> chunk(settings.read_chunk_size, 0);
-      std::size_t bytes_read = 0;
-      serial_port.Read(chunk.data(), chunk.size(), 25, bytes_read);
+    while (shouldKeepRunning) {
+      LibSerial::DataBuffer chunkBuffer;
+      m_SerialPort.Read(chunkBuffer, serialSettings.readChunkSize, serialSettings.silenceTimeout.count());
+      const std::size_t bytesRead = chunkBuffer.size();
 
-      if (bytes_read > 0) {
-        seen_data = true;
-        last_data_time = std::chrono::steady_clock::now();
-        chunk.resize(bytes_read);
-        buffer.insert(buffer.end(), chunk.begin(), chunk.end());
-      } else if (seen_data && (std::chrono::steady_clock::now() - last_data_time) >= settings.silence_timeout) {
-        break;
+      if (bytesRead > 0) {
+        hasCapturedData = true;
+        lastCapturedDataTimestamp = std::chrono::steady_clock::now();
+        transmissionBuffer.reserve(transmissionBuffer.size() + bytesRead);
+        for (std::size_t chunkByteIndex = 0; chunkByteIndex < bytesRead; ++chunkByteIndex) {
+          transmissionBuffer.push_back(static_cast<std::uint8_t>(chunkBuffer[chunkByteIndex]));
+        }
+        continue;
+      }
+
+      if (hasCapturedData &&
+          (std::chrono::steady_clock::now() - lastCapturedDataTimestamp) >= serialSettings.silenceTimeout) {
+        return transmissionBuffer;
+      }
+
+      if (!m_SerialPort.IsOpen()) {
+        m_IsSerialPortOpen = false;
+        if (m_Log) {
+          m_Log->warning("[LptListener Warning]: Serial port is no longer open. Reopening.");
+        }
+        ensureSerialPortOpen(serialSettings);
       }
     }
-
-    serial_port.Close();
-    return buffer;
+    return {};
   }
 
 private:
-  const ISettingsRepository& settings_repository_;
+  void ensureSerialPortOpen(const SerialSettings& serialSettings) {
+    const bool shouldReopenPort = (!m_IsSerialPortOpen || m_OpenDevicePath != serialSettings.devicePath);
+    if (!shouldReopenPort) {
+      return;
+    }
+
+    closeSerialPortIfOpen();
+
+    try {
+      if (m_Log) {
+        m_Log->information("[LptListener Info]: Opening serial device: " + serialSettings.devicePath);
+      }
+      m_SerialPort.Open(serialSettings.devicePath);
+      m_SerialPort.SetBaudRate(toBaudRate(serialSettings.baudRate));
+      m_IsSerialPortOpen = true;
+      m_OpenDevicePath = serialSettings.devicePath;
+      if (m_Log) {
+        m_Log->information("[LptListener Info]: Serial device opened successfully.");
+      }
+    } catch (const std::exception& openException) {
+      std::string errorReason = openException.what();
+      if (errorReason.find("busy") != std::string::npos || errorReason.find("Device or resource busy") != std::string::npos) {
+        errorReason += " The serial device may already be open by another process.";
+      }
+      throw std::runtime_error(
+          "[LptManager Error]: Failed to open serial device '" + serialSettings.devicePath + "'. Reason: " + errorReason);
+    }
+  }
+
+  void closeSerialPortIfOpen() {
+    if (!m_IsSerialPortOpen) {
+      return;
+    }
+    m_SerialPort.Close();
+    m_IsSerialPortOpen = false;
+    m_OpenDevicePath.clear();
+    if (m_Log) {
+      m_Log->information("[LptListener Info]: Serial device closed.");
+    }
+  }
+
+  const ISettingsRepository& m_SettingsRepository;
+  SharedLogger m_Log;
+  LibSerial::SerialPort m_SerialPort;
+  bool m_IsSerialPortOpen{false};
+  std::string m_OpenDevicePath;
 };
 
 class PrnPatcher final : public IPrnPatcher {
 public:
   using PatchGenerator = std::function<std::string(const VehicleSelection&)>;
 
-  explicit PrnPatcher(const ISelectedVehicleStore& selected_vehicle_store)
-      : selected_vehicle_store_(selected_vehicle_store) {}
+  PrnPatcher(const ISelectedVehicleStore& selectedVehicleStore, SharedLogger log)
+      : m_SelectedVehicleStore(selectedVehicleStore), m_Log(std::move(log)) {}
 
-  void addPatch(std::size_t offset, PatchGenerator generator) {
-    patches_.emplace_back(offset, std::move(generator));
+  void addPatch(std::size_t patchOffset, PatchGenerator patchGenerator) {
+    m_Patches.emplace_back(patchOffset, std::move(patchGenerator));
   }
 
-  std::vector<std::uint8_t> patch(const std::vector<std::uint8_t>& input_bytes) override {
-    std::vector<std::uint8_t> output = input_bytes;
-    const VehicleSelection selected_vehicle = selected_vehicle_store_.getSelectedVehicle();
+  std::vector<std::uint8_t> patch(const std::vector<std::uint8_t>& inputBytes) override {
+    if (m_Log) {
+      m_Log->information("[PrnPatcher Info]: Applying PRN patches to incoming bytes.");
+    }
+    std::vector<std::uint8_t> patchedOutputBytes = inputBytes;
+    const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
 
-    for (const auto& [offset, generator] : patches_) {
-      const std::string replacement = generator(selected_vehicle);
-      if (offset >= output.size()) {
+    for (const auto& [patchOffset, patchGenerator] : m_Patches) {
+      const std::string replacementText = patchGenerator(selectedVehicle);
+      if (patchOffset >= patchedOutputBytes.size()) {
         continue;
       }
 
-      const auto replace_count = std::min(replacement.size(), output.size() - offset);
-      for (std::size_t i = 0; i < replace_count; ++i) {
-        output[offset + i] = static_cast<std::uint8_t>(replacement[i]);
+      const auto replacementByteCount = std::min(replacementText.size(), patchedOutputBytes.size() - patchOffset);
+      for (std::size_t byteIndex = 0; byteIndex < replacementByteCount; ++byteIndex) {
+        patchedOutputBytes[patchOffset + byteIndex] = static_cast<std::uint8_t>(replacementText[byteIndex]);
       }
     }
 
-    return output;
+    return patchedOutputBytes;
   }
 
 private:
-  const ISelectedVehicleStore& selected_vehicle_store_;
-  std::vector<std::pair<std::size_t, PatchGenerator>> patches_;
+  const ISelectedVehicleStore& m_SelectedVehicleStore;
+  std::vector<std::pair<std::size_t, PatchGenerator>> m_Patches;
+  SharedLogger m_Log;
 };
 
 class PrnRenderer final : public IPrnRenderer {
 public:
-  std::vector<RenderedPage> render(const std::vector<std::uint8_t>& patched_bytes) override {
-    RenderedPage page;
-    page.page_index = 0;
-    page.width = 1;
-    page.height = patched_bytes.size();
-    page.pixels = patched_bytes;
-    return {std::move(page)};
+  explicit PrnRenderer(SharedLogger log) : m_Log(std::move(log)) {}
+
+  std::vector<RenderedPage> render(const std::vector<std::uint8_t>& patchedBytes) override {
+    if (m_Log) {
+      m_Log->information("[PrnRenderer Info]: Rendering patched bytes into page buffer.");
+    }
+    RenderedPage renderedPage;
+    renderedPage.pageIndex = 0;
+    renderedPage.width = 1;
+    renderedPage.height = patchedBytes.size();
+    renderedPage.pixels = patchedBytes;
+    return {std::move(renderedPage)};
   }
+
+private:
+  SharedLogger m_Log;
 };
 
 class RenderedDocumentWriter final : public IRenderedDocumentWriter {
 public:
-  explicit RenderedDocumentWriter(std::filesystem::path output_directory)
-      : output_directory_(std::move(output_directory)) {}
+  RenderedDocumentWriter(std::filesystem::path outputDirectory, SharedLogger log)
+      : m_OutputDirectory(std::move(outputDirectory)), m_Log(std::move(log)) {}
 
-  void writePages(const std::vector<RenderedPage>& pages, const std::string& document_id) override {
-    std::filesystem::create_directories(output_directory_);
+  void writePages(const std::vector<RenderedPage>& pages, const std::string& documentId) override {
+    if (m_Log) {
+      m_Log->information("[RenderedDocumentWriter Info]: Writing rendered pages to disk.");
+    }
+    std::filesystem::create_directories(m_OutputDirectory);
 
-    for (const auto& page : pages) {
-      std::ostringstream filename;
-      filename << document_id << "_page_" << page.page_index << ".bin";
-      const std::filesystem::path full_path = output_directory_ / filename.str();
+    for (const auto& renderedPage : pages) {
+      std::ostringstream filenameStream;
+      filenameStream << documentId << "_page_" << renderedPage.pageIndex << ".bin";
+      const std::filesystem::path fullPath = m_OutputDirectory / filenameStream.str();
 
-      std::ofstream stream(full_path, std::ios::binary);
-      stream.write(reinterpret_cast<const char*>(page.pixels.data()), static_cast<std::streamsize>(page.pixels.size()));
+      std::ofstream outputStream(fullPath, std::ios::binary);
+      outputStream.write(reinterpret_cast<const char*>(renderedPage.pixels.data()),
+                         static_cast<std::streamsize>(renderedPage.pixels.size()));
     }
   }
 
 private:
-  std::filesystem::path output_directory_;
+  std::filesystem::path m_OutputDirectory;
+  SharedLogger m_Log;
 };
 
 } // namespace brake_tester
