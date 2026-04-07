@@ -48,6 +48,8 @@ public:
 
   std::vector<std::uint8_t> captureTransmission(const std::atomic_bool& shouldKeepRunning) override {
     const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
+    const auto endOfTransmissionSilenceTimeout =
+        std::max(serialSettings.silenceTimeout * 4, std::chrono::milliseconds(1000));
     std::vector<std::uint8_t> transmissionBuffer;
     transmissionBuffer.reserve(2048);
 
@@ -71,14 +73,15 @@ public:
 
         if (isReadTimeout) {
           if (hasCapturedData &&
-              (std::chrono::steady_clock::now() - lastCapturedDataTimestamp) >= serialSettings.silenceTimeout) {
+              (std::chrono::steady_clock::now() - lastCapturedDataTimestamp) >= endOfTransmissionSilenceTimeout) {
             if (m_Log) {
               const auto captureElapsedMilliseconds =
                   std::chrono::duration_cast<std::chrono::milliseconds>(lastCapturedDataTimestamp - captureStartTimestamp)
                       .count();
               m_Log->information("[LptListener Info]: Byte capture ended. Total bytes: " +
                                  std::to_string(transmissionBuffer.size()) + ", elapsedMs: " +
-                                 std::to_string(captureElapsedMilliseconds));
+                                 std::to_string(captureElapsedMilliseconds) + ", endSilenceTimeoutMs: " +
+                                 std::to_string(endOfTransmissionSilenceTimeout.count()));
             }
             m_LptStore.setListenerStatus(LptListenerStatus::Idle);
             return transmissionBuffer;
@@ -126,14 +129,15 @@ public:
       }
 
       if (hasCapturedData &&
-          (std::chrono::steady_clock::now() - lastCapturedDataTimestamp) >= serialSettings.silenceTimeout) {
+          (std::chrono::steady_clock::now() - lastCapturedDataTimestamp) >= endOfTransmissionSilenceTimeout) {
         if (m_Log) {
           const auto captureElapsedMilliseconds =
               std::chrono::duration_cast<std::chrono::milliseconds>(lastCapturedDataTimestamp - captureStartTimestamp)
                   .count();
           m_Log->information("[LptListener Info]: Byte capture ended. Total bytes: " +
                              std::to_string(transmissionBuffer.size()) + ", elapsedMs: " +
-                             std::to_string(captureElapsedMilliseconds));
+                             std::to_string(captureElapsedMilliseconds) + ", endSilenceTimeoutMs: " +
+                             std::to_string(endOfTransmissionSilenceTimeout.count()));
         }
         m_LptStore.setListenerStatus(LptListenerStatus::Idle);
         return transmissionBuffer;
