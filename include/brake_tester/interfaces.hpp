@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -25,7 +26,7 @@ public:
 class ILptListener {
 public:
   virtual ~ILptListener() = default;
-  virtual std::vector<std::uint8_t> captureTransmission() = 0;
+  virtual std::vector<std::uint8_t> captureTransmission(const std::atomic_bool& shouldKeepRunning) = 0;
 };
 
 class IPrnPatcher {

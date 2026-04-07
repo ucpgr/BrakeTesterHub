@@ -39,7 +39,7 @@ public:
     m_WorkerThread = std::thread([this] {
       while (m_IsRunning) {
         try {
-          auto incomingBytes = m_Listener->captureTransmission();
+          auto incomingBytes = m_Listener->captureTransmission(m_IsRunning);
           if (incomingBytes.empty()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;

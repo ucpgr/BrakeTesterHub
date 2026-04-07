@@ -40,7 +40,11 @@ public:
   LptListener(const ISettingsRepository& settingsRepository, SharedLogger log)
       : m_SettingsRepository(settingsRepository), m_Log(std::move(log)) {}
 
-  std::vector<std::uint8_t> captureTransmission() override {
+  ~LptListener() override {
+    closeSerialPortIfOpen();
+  }
+
+  std::vector<std::uint8_t> captureTransmission(const std::atomic_bool& shouldKeepRunning) override {
     const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
     if (m_Log) {
       m_Log->information("[LptListener Info]: Starting transmission capture cycle.");
@@ -49,16 +53,47 @@ public:
     std::vector<std::uint8_t> transmissionBuffer;
     transmissionBuffer.reserve(2048);
 
-    LibSerial::SerialPort serialPort;
     if (serialSettings.devicePath.empty() && m_Log) {
       m_Log->Critical("Serial port path is empty");
     }
+    ensureSerialPortOpen(serialSettings);
+
+    while (shouldKeepRunning) {
+      LibSerial::DataBuffer chunkBuffer;
+      m_SerialPort.Read(chunkBuffer, serialSettings.readChunkSize, serialSettings.silenceTimeout.count());
+      const std::size_t bytesRead = chunkBuffer.size();
+
+      if (bytesRead > 0) {
+        transmissionBuffer.reserve(transmissionBuffer.size() + bytesRead);
+        for (std::size_t chunkByteIndex = 0; chunkByteIndex < bytesRead; ++chunkByteIndex) {
+          transmissionBuffer.push_back(static_cast<std::uint8_t>(chunkBuffer[chunkByteIndex]));
+        }
+        if (m_Log) {
+          m_Log->information("[LptListener Info]: Captured " + std::to_string(bytesRead) + " bytes from serial device.");
+        }
+        return transmissionBuffer;
+      }
+    }
+    return {};
+  }
+
+private:
+  void ensureSerialPortOpen(const SerialSettings& serialSettings) {
+    const bool shouldReopenPort = (!m_IsSerialPortOpen || m_OpenDevicePath != serialSettings.devicePath);
+    if (!shouldReopenPort) {
+      return;
+    }
+
+    closeSerialPortIfOpen();
+
     try {
       if (m_Log) {
         m_Log->information("[LptListener Info]: Opening serial device: " + serialSettings.devicePath);
       }
-      serialPort.Open(serialSettings.devicePath);
-      serialPort.SetBaudRate(toBaudRate(serialSettings.baudRate));
+      m_SerialPort.Open(serialSettings.devicePath);
+      m_SerialPort.SetBaudRate(toBaudRate(serialSettings.baudRate));
+      m_IsSerialPortOpen = true;
+      m_OpenDevicePath = serialSettings.devicePath;
       if (m_Log) {
         m_Log->information("[LptListener Info]: Serial device opened successfully.");
       }
@@ -70,34 +105,25 @@ public:
       throw std::runtime_error(
           "[LptManager Error]: Failed to open serial device '" + serialSettings.devicePath + "'. Reason: " + errorReason);
     }
-
-    while (true) {
-      LibSerial::DataBuffer chunkBuffer;
-      serialPort.Read(chunkBuffer, serialSettings.readChunkSize, 0);
-      const std::size_t bytesRead = chunkBuffer.size();
-
-      if (bytesRead > 0) {
-        transmissionBuffer.reserve(transmissionBuffer.size() + bytesRead);
-        for (std::size_t chunkByteIndex = 0; chunkByteIndex < bytesRead; ++chunkByteIndex) {
-          transmissionBuffer.push_back(static_cast<std::uint8_t>(chunkBuffer[chunkByteIndex]));
-        }
-        if (m_Log) {
-          m_Log->information("[LptListener Info]: Captured " + std::to_string(bytesRead) + " bytes from serial device.");
-        }
-        break;
-      }
-    }
-
-    serialPort.Close();
-    if (m_Log) {
-      m_Log->information("[LptListener Info]: Serial device closed after capture cycle.");
-    }
-    return transmissionBuffer;
   }
 
-private:
+  void closeSerialPortIfOpen() {
+    if (!m_IsSerialPortOpen) {
+      return;
+    }
+    m_SerialPort.Close();
+    m_IsSerialPortOpen = false;
+    m_OpenDevicePath.clear();
+    if (m_Log) {
+      m_Log->information("[LptListener Info]: Serial device closed.");
+    }
+  }
+
   const ISettingsRepository& m_SettingsRepository;
   SharedLogger m_Log;
+  LibSerial::SerialPort m_SerialPort;
+  bool m_IsSerialPortOpen{false};
+  std::string m_OpenDevicePath;
 };
 
 class PrnPatcher final : public IPrnPatcher {
