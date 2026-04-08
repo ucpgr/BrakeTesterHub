@@ -4,6 +4,7 @@
 #include <chrono>
 #include <ctime>
 #include <exception>
+#include <filesystem>
 #include <iomanip>
 #include <memory>
 #include <random>
@@ -20,7 +21,6 @@ public:
   LptManager(std::unique_ptr<ILptListener> listener,
              std::unique_ptr<IPrnPatcher> patcher,
              std::unique_ptr<IPrnRenderer> renderer,
-             std::unique_ptr<IRenderedDocumentWriter> writer,
              std::unique_ptr<IPrnWriter> prnWriter,
              ILptStore& lptStore,
              const ISettingsRepository& settingsRepository,
@@ -28,7 +28,6 @@ public:
       : m_Listener(std::move(listener)),
         m_Patcher(std::move(patcher)),
         m_Renderer(std::move(renderer)),
-        m_Writer(std::move(writer)),
         m_PrnWriter(std::move(prnWriter)),
         m_LptStore(lptStore),
         m_SettingsRepository(settingsRepository),
@@ -63,9 +62,8 @@ public:
           m_LptStore.setCurrentCaptureFilename(captureFilename);
 
           auto patchedBytes = m_Patcher->patch(incomingBytes);
-          auto renderedPages = m_Renderer->render(patchedBytes);
-          m_Writer->writePages(renderedPages, captureFilename);
           m_PrnWriter->writePrn(patchedBytes, captureFilename);
+          m_Renderer->render(std::filesystem::path(captureFilename).concat(".prn"));
         } catch (const std::exception& processingException) {
           if (m_Log) {
             m_Log->Error(processingException.what());
@@ -143,7 +141,6 @@ private:
   std::unique_ptr<ILptListener> m_Listener;
   std::unique_ptr<IPrnPatcher> m_Patcher;
   std::unique_ptr<IPrnRenderer> m_Renderer;
-  std::unique_ptr<IRenderedDocumentWriter> m_Writer;
   std::unique_ptr<IPrnWriter> m_PrnWriter;
   ILptStore& m_LptStore;
   const ISettingsRepository& m_SettingsRepository;

@@ -36,13 +36,11 @@ public:
     //patcher->addPatch(0x45F, [](const VehicleSelection&) { return std::string("patched"); });
 
     auto renderer = std::make_unique<PrnRenderer>(m_Log);
-    auto writer = std::make_unique<RenderedDocumentWriter>(".", m_Log);
     auto prnWriter = std::make_unique<PrnWriter>(".", m_Log);
 
     m_LptManager = std::make_unique<LptManager>(std::move(listener),
                                                 std::move(patcher),
                                                 std::move(renderer),
-                                                std::move(writer),
                                                 std::move(prnWriter),
                                                 *m_LptStore,
                                                 *m_SettingsRepository,
