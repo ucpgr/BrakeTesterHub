@@ -283,7 +283,6 @@ public:
     std::vector<std::vector<std::uint8_t>> currentPageLines;
     std::optional<std::size_t> lastAxleSplitLineIndex;
 
-    auto measurementRenderer = makeMeasurementRenderer();
     const auto lines = splitIntoLines(patchedBytes);
 
     for (const auto& line : lines) {
@@ -291,10 +290,9 @@ public:
         lastAxleSplitLineIndex = currentPageLines.size();
       }
 
-      measurementRenderer.addBytes(line.begin(), line.end());
       currentPageLines.push_back(line);
 
-      if (measurementRenderer.cursorY() <= kPageMaxHeightPixels) {
+      if (measureCursorY(currentPageLines) <= kPageMaxHeightPixels) {
         continue;
       }
 
@@ -314,15 +312,7 @@ public:
         currentPageLines.clear();
       }
 
-      measurementRenderer = makeMeasurementRenderer();
-      lastAxleSplitLineIndex.reset();
-      for (std::size_t lineIndex = 0; lineIndex < currentPageLines.size(); ++lineIndex) {
-        const auto& bufferedLine = currentPageLines[lineIndex];
-        if (isAxleStartLine(bufferedLine) && lineIndex > 0) {
-          lastAxleSplitLineIndex = lineIndex;
-        }
-        measurementRenderer.addBytes(bufferedLine.begin(), bufferedLine.end());
-      }
+      lastAxleSplitLineIndex = findLastAxleSplitLineIndex(currentPageLines);
     }
 
     if (!currentPageLines.empty()) {
@@ -364,8 +354,22 @@ private:
     return line.size() >= 2 && line[0] == 0x1B && line[1] == 0x45;
   }
 
-  static ESCP2Renderer makeMeasurementRenderer() {
-    return ESCP2Renderer([](size_t, size_t, uint8_t) {});
+  static std::size_t measureCursorY(const std::vector<std::vector<std::uint8_t>>& lines) {
+    ESCP2Renderer measurementRenderer([](size_t, size_t, uint8_t) {});
+    for (const auto& line : lines) {
+      measurementRenderer.addBytes(line.begin(), line.end());
+    }
+    return measurementRenderer.cursorY();
+  }
+
+  static std::optional<std::size_t> findLastAxleSplitLineIndex(const std::vector<std::vector<std::uint8_t>>& lines) {
+    std::optional<std::size_t> splitLineIndex;
+    for (std::size_t lineIndex = 1; lineIndex < lines.size(); ++lineIndex) {
+      if (isAxleStartLine(lines[lineIndex])) {
+        splitLineIndex = lineIndex;
+      }
+    }
+    return splitLineIndex;
   }
 
   static RenderedPage renderPage(const std::vector<std::vector<std::uint8_t>>& lines, std::size_t pageIndex) {
