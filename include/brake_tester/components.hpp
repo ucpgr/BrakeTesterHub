@@ -16,7 +16,6 @@
 
 #include <libserial/SerialPort.h>
 
-#include "brake_tester/ESCP2Renderer.h"
 #include "brake_tester/interfaces.hpp"
 #include "brake_tester/logging.hpp"
 
@@ -279,87 +278,12 @@ public:
     if (m_Log) {
       m_Log->information("[PrnRenderer Info]: Rendering patched bytes into page buffer.");
     }
-    struct Pixel {
-      std::size_t x{0};
-      std::size_t y{0};
-      std::uint8_t value{0};
-    };
-
-    std::vector<Pixel> renderedPixels;
-    renderedPixels.reserve(patchedBytes.size());
-    std::size_t maxX = 0;
-    std::size_t maxY = 0;
-    ESCP2Renderer renderer([&renderedPixels, &maxX, &maxY](std::size_t x, std::size_t y, std::uint8_t colour) {
-      renderedPixels.push_back(Pixel{x, y, static_cast<std::uint8_t>(colour == 0 ? 1 : colour)});
-      maxX = std::max(maxX, x);
-      maxY = std::max(maxY, y);
-    });
-
-    constexpr std::size_t kMaxPageHeightPixels = 800;
-    std::vector<std::size_t> pageStartYValues{0};
-    std::size_t lastAxleStartY = 0;
-
-    auto processChunk = [&](const std::vector<std::uint8_t>& chunk) {
-      if (chunk.size() >= 2 && chunk[0] == 0x1B && chunk[1] == 0x45) {
-        lastAxleStartY = renderer.getCursorY();
-      }
-
-      renderer.addBytes(chunk.begin(), chunk.end());
-
-      const std::size_t currentPageStartY = pageStartYValues.back();
-      const std::size_t renderedHeight = renderer.getCursorY() > currentPageStartY ? renderer.getCursorY() - currentPageStartY : 0;
-      if (renderedHeight > kMaxPageHeightPixels && lastAxleStartY > currentPageStartY) {
-        pageStartYValues.push_back(lastAxleStartY);
-      }
-    };
-
-    std::vector<std::uint8_t> lineBuffer;
-    lineBuffer.reserve(256);
-    for (const std::uint8_t inputByte : patchedBytes) {
-      lineBuffer.push_back(inputByte);
-      if (inputByte == 0x0A) {
-        processChunk(lineBuffer);
-        lineBuffer.clear();
-      }
-    }
-    if (!lineBuffer.empty()) {
-      processChunk(lineBuffer);
-    }
-
-    if (renderedPixels.empty()) {
-      return {};
-    }
-
-    const std::size_t documentHeight = std::max(maxY + 1, renderer.getCursorY() + 1);
-    const std::size_t pageWidth = maxX + 1;
-    pageStartYValues.push_back(documentHeight);
-
-    std::vector<RenderedPage> pages;
-    for (std::size_t pageIndex = 0; pageIndex + 1 < pageStartYValues.size(); ++pageIndex) {
-      const std::size_t pageStartY = pageStartYValues[pageIndex];
-      const std::size_t pageEndY = pageStartYValues[pageIndex + 1];
-      if (pageEndY <= pageStartY) {
-        continue;
-      }
-
-      RenderedPage page;
-      page.pageIndex = pages.size();
-      page.width = pageWidth;
-      page.height = pageEndY - pageStartY;
-      page.pixels.assign(page.width * page.height, 0);
-
-      for (const auto& pixel : renderedPixels) {
-        if (pixel.y < pageStartY || pixel.y >= pageEndY || pixel.x >= page.width) {
-          continue;
-        }
-        const std::size_t localY = pixel.y - pageStartY;
-        page.pixels[(localY * page.width) + pixel.x] = pixel.value;
-      }
-
-      pages.push_back(std::move(page));
-    }
-
-    return pages;
+    RenderedPage renderedPage;
+    renderedPage.pageIndex = 0;
+    renderedPage.width = 1;
+    renderedPage.height = patchedBytes.size();
+    renderedPage.pixels = patchedBytes;
+    return {std::move(renderedPage)};
   }
 
 private:
@@ -375,11 +299,12 @@ public:
     if (m_Log) {
       m_Log->information("[RenderedDocumentWriter Info]: Writing rendered pages to disk.");
     }
+    std::filesystem::create_directories(m_OutputDirectory);
+
     for (const auto& renderedPage : pages) {
-      std::filesystem::path relativePath(documentId);
-      relativePath += "_" + std::to_string(renderedPage.pageIndex) + ".bin";
-      const std::filesystem::path fullPath = m_OutputDirectory / relativePath;
-      std::filesystem::create_directories(fullPath.parent_path());
+      std::ostringstream filenameStream;
+      filenameStream << documentId << "_page_" << renderedPage.pageIndex << ".bin";
+      const std::filesystem::path fullPath = m_OutputDirectory / filenameStream.str();
 
       std::ofstream outputStream(fullPath, std::ios::binary);
       outputStream.write(reinterpret_cast<const char*>(renderedPage.pixels.data()),

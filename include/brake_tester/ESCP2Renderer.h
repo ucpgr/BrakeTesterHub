@@ -104,8 +104,6 @@ class ESCP2Renderer
 public:
     explicit ESCP2Renderer(const std::function<void(size_t, size_t, uint8_t)> &setPixel) : m_State({setPixel}) {}
 
-    [[nodiscard]] size_t getCursorY() const { return m_State.cursorY; }
-
     template <typename IteratorType>
     void addBytes(IteratorType begin, IteratorType end)
     {
