@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -278,22 +279,113 @@ public:
     if (m_Log) {
       m_Log->information("[PrnRenderer Info]: Rendering patched bytes into page buffer.");
     }
-    RenderedPage renderedPage;
-    renderedPage.pageIndex = 0;
+    std::vector<RenderedPage> pages;
+    std::vector<std::vector<std::uint8_t>> currentPageLines;
+    std::optional<std::size_t> lastAxleSplitLineIndex;
 
-    ESCP2Renderer escRenderer([&renderedPage](size_t x, size_t y, uint8_t colour)
-    {
-      setPixelPacked(renderedPage.pixels, 1088, x, y, (colour == 0 ? true : false));
-    });
+    const auto lines = splitIntoLines(patchedBytes);
 
-    escRenderer.addBytes(patchedBytes.begin(), patchedBytes.end());
+    for (const auto& line : lines) {
+      if (isAxleStartLine(line) && !currentPageLines.empty()) {
+        lastAxleSplitLineIndex = currentPageLines.size();
+      }
 
+      currentPageLines.push_back(line);
 
-    return {std::move(renderedPage)};
+      if (measureCursorY(currentPageLines) <= kPageMaxHeightPixels) {
+        continue;
+      }
+
+      if (lastAxleSplitLineIndex.has_value() && *lastAxleSplitLineIndex > 0) {
+        const std::size_t splitLineIndex = *lastAxleSplitLineIndex;
+        const std::vector<std::vector<std::uint8_t>> finishedPageLines(
+            currentPageLines.begin(),
+            currentPageLines.begin() + static_cast<std::ptrdiff_t>(splitLineIndex));
+        pages.push_back(renderPage(finishedPageLines, pages.size()));
+
+        std::vector<std::vector<std::uint8_t>> overflowLines(
+            currentPageLines.begin() + static_cast<std::ptrdiff_t>(splitLineIndex),
+            currentPageLines.end());
+        currentPageLines = std::move(overflowLines);
+      } else {
+        pages.push_back(renderPage(currentPageLines, pages.size()));
+        currentPageLines.clear();
+      }
+
+      lastAxleSplitLineIndex = findLastAxleSplitLineIndex(currentPageLines);
+    }
+
+    if (!currentPageLines.empty()) {
+      pages.push_back(renderPage(currentPageLines, pages.size()));
+    }
+
+    if (pages.empty()) {
+      pages.push_back(renderPage({}, 0));
+    }
+
+    return pages;
   }
 
 private:
+  static constexpr std::size_t kPageMaxHeightPixels = 800;
   SharedLogger m_Log;
+
+  static std::vector<std::vector<std::uint8_t>> splitIntoLines(const std::vector<std::uint8_t>& bytes) {
+    std::vector<std::vector<std::uint8_t>> lines;
+    std::vector<std::uint8_t> currentLine;
+    currentLine.reserve(256);
+
+    for (const auto byte : bytes) {
+      currentLine.push_back(byte);
+      if (byte == 0x0A) {
+        lines.push_back(std::move(currentLine));
+        currentLine.clear();
+      }
+    }
+
+    if (!currentLine.empty()) {
+      lines.push_back(std::move(currentLine));
+    }
+
+    return lines;
+  }
+
+  static bool isAxleStartLine(const std::vector<std::uint8_t>& line) {
+    return line.size() >= 2 && line[0] == 0x1B && line[1] == 0x45;
+  }
+
+  static std::size_t measureCursorY(const std::vector<std::vector<std::uint8_t>>& lines) {
+    ESCP2Renderer measurementRenderer([](size_t, size_t, uint8_t) {});
+    for (const auto& line : lines) {
+      measurementRenderer.addBytes(line.begin(), line.end());
+    }
+    return measurementRenderer.cursorY();
+  }
+
+  static std::optional<std::size_t> findLastAxleSplitLineIndex(const std::vector<std::vector<std::uint8_t>>& lines) {
+    std::optional<std::size_t> splitLineIndex;
+    for (std::size_t lineIndex = 1; lineIndex < lines.size(); ++lineIndex) {
+      if (isAxleStartLine(lines[lineIndex])) {
+        splitLineIndex = lineIndex;
+      }
+    }
+    return splitLineIndex;
+  }
+
+  static RenderedPage renderPage(const std::vector<std::vector<std::uint8_t>>& lines, std::size_t pageIndex) {
+    RenderedPage renderedPage;
+    renderedPage.pageIndex = pageIndex;
+
+    ESCP2Renderer escRenderer([&renderedPage](size_t x, size_t y, uint8_t colour) {
+      setPixelPacked(renderedPage.pixels, 1088, static_cast<int>(x), static_cast<int>(y), (colour == 0));
+    });
+
+    for (const auto& line : lines) {
+      escRenderer.addBytes(line.begin(), line.end());
+    }
+
+    return renderedPage;
+  }
 
 
   static void setPixelPacked(std::vector<uint8_t>& buffer,
@@ -337,12 +429,11 @@ public:
       : m_OutputDirectory(std::move(outputDirectory)), m_Log(std::move(log)) {}
 
   void writePages(const std::vector<RenderedPage>& pages, const std::string& documentId) override {
-    std::filesystem::create_directories(m_OutputDirectory);
-
     for (const auto& renderedPage : pages) {
-      std::ostringstream filenameStream;
-      filenameStream << documentId << "_page_" << renderedPage.pageIndex << ".bin";
-      const std::filesystem::path fullPath = m_OutputDirectory / filenameStream.str();
+      std::ostringstream relativePathStream;
+      relativePathStream << documentId << "_" << renderedPage.pageIndex << ".bin";
+      const std::filesystem::path fullPath = m_OutputDirectory / relativePathStream.str();
+      std::filesystem::create_directories(fullPath.parent_path());
 
       if (m_Log) {
         m_Log->information("[RenderedDocumentWriter Info]: Writing rendered pages at: " + fullPath.string());

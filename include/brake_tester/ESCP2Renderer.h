@@ -2,6 +2,7 @@
 #include <functional>
 #include <array>
 #include <cstdint>
+#include <iterator>
 #include "brake_tester/RomanS8pt7b.h"
 
 class ESCP2Renderer
@@ -104,14 +105,24 @@ class ESCP2Renderer
 public:
     explicit ESCP2Renderer(const std::function<void(size_t, size_t, uint8_t)> &setPixel) : m_State({setPixel}) {}
 
+    [[nodiscard]] size_t cursorY() const
+    {
+        return m_State.cursorY;
+    }
+
     template <typename IteratorType>
     void addBytes(IteratorType begin, IteratorType end)
     {
         while (begin != end)
         {
+            const auto remainingBytes = std::distance(begin, end);
 
             if (m_State.rasterColumns > 0)
             {
+                if (remainingBytes < 3)
+                {
+                    break;
+                }
                 m_State.rasterColumns--;
 
                 rasterLine(m_State, *(begin++)); m_State.cursorY += 8;
@@ -127,6 +138,10 @@ public:
             if (*begin == 0x1B) // ESC
             {
                 ++begin;
+                if (begin == end)
+                {
+                    break;
+                }
 
                 for (auto &command : m_Commands)
                 {
@@ -145,6 +160,10 @@ public:
                 {
                     if (*begin == command.name)
                     {
+                        if (std::distance(begin, end) < 2)
+                        {
+                            return;
+                        }
                         command.execute(m_State, {*(++begin)});
                         matched = true;
                         ++begin;
@@ -158,6 +177,10 @@ public:
                 {
                     if (*begin == command.name)
                     {
+                        if (std::distance(begin, end) < 3)
+                        {
+                            return;
+                        }
                         command.execute(m_State, {*(++begin), *(++begin)});
                         matched = true;
                         ++begin;
@@ -171,6 +194,10 @@ public:
                 {
                     if (*begin == command.name)
                     {
+                        if (std::distance(begin, end) < 4)
+                        {
+                            return;
+                        }
                         command.execute(m_State, {*(++begin), *(++begin), *(++begin)});
                         matched = true;
                         ++begin;
