@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -48,7 +49,7 @@ public:
 class IPrnRenderer {
 public:
   virtual ~IPrnRenderer() = default;
-  virtual std::vector<RenderedPage> render(const std::vector<std::uint8_t>& patched_bytes) = 0;
+  virtual void render(const std::filesystem::path& prnFilePath) = 0;
 };
 
 class IRenderedDocumentWriter {

@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -275,150 +276,76 @@ class PrnRenderer final : public IPrnRenderer {
 public:
   explicit PrnRenderer(SharedLogger log) : m_Log(std::move(log)) {}
 
-  std::vector<RenderedPage> render(const std::vector<std::uint8_t>& patchedBytes) override {
-    if (m_Log) {
-      m_Log->information("[PrnRenderer Info]: Rendering patched bytes into page buffer.");
-    }
-    std::vector<RenderedPage> pages;
-    std::vector<std::vector<std::uint8_t>> currentPageLines;
-    std::optional<std::size_t> lastAxleSplitLineIndex;
+  void render(const std::filesystem::path& prnFilePath) override {
+    const std::filesystem::path pdfFolder = std::filesystem::path("tests") / "pdf";
+    cleanupPdfFolder(pdfFolder);
 
-    const auto lines = splitIntoLines(patchedBytes);
+    const std::string prnFilePathString = prnFilePath.string();
+    const std::string renderCommand =
+        "printerToPDF -8 -o tests/ -f font2/Epson-PC437-US.C16 " + shellQuote(prnFilePathString);
+    runCommand(renderCommand, "[PrnRenderer Error]: Failed to render prn with printerToPDF.");
 
-    for (const auto& line : lines) {
-      if (isAxleStartLine(line) && !currentPageLines.empty()) {
-        lastAxleSplitLineIndex = currentPageLines.size();
-      }
-
-      currentPageLines.push_back(line);
-
-      if (measureCursorY(currentPageLines) <= kPageMaxHeightPixels) {
-        continue;
-      }
-
-      if (lastAxleSplitLineIndex.has_value() && *lastAxleSplitLineIndex > 0) {
-        const std::size_t splitLineIndex = *lastAxleSplitLineIndex;
-        const std::vector<std::vector<std::uint8_t>> finishedPageLines(
-            currentPageLines.begin(),
-            currentPageLines.begin() + static_cast<std::ptrdiff_t>(splitLineIndex));
-        pages.push_back(renderPage(finishedPageLines, pages.size()));
-
-        std::vector<std::vector<std::uint8_t>> overflowLines(
-            currentPageLines.begin() + static_cast<std::ptrdiff_t>(splitLineIndex),
-            currentPageLines.end());
-        currentPageLines = std::move(overflowLines);
-      } else {
-        pages.push_back(renderPage(currentPageLines, pages.size()));
-        currentPageLines.clear();
-      }
-
-      lastAxleSplitLineIndex = findLastAxleSplitLineIndex(currentPageLines);
+    const auto pagePdfPaths = collectGeneratedPages(pdfFolder);
+    if (pagePdfPaths.empty()) {
+      throw std::runtime_error("[PrnRenderer Error]: No page PDFs generated in tests/pdf.");
     }
 
-    if (!currentPageLines.empty()) {
-      pages.push_back(renderPage(currentPageLines, pages.size()));
+    std::string mergeCommand = "pdfunite";
+    for (const auto& pagePdfPath : pagePdfPaths) {
+      mergeCommand += " " + shellQuote(pagePdfPath.string());
     }
+    mergeCommand += " " + shellQuote(prnFilePathString + ".pdf");
+    runCommand(mergeCommand, "[PrnRenderer Error]: Failed to merge rendered PDFs with pdfunite.");
 
-    if (pages.empty()) {
-      pages.push_back(renderPage({}, 0));
-    }
-
-    return pages;
+    cleanupPdfFolder(pdfFolder);
   }
 
 private:
-  static constexpr std::size_t kPageMaxHeightPixels = 800;
   SharedLogger m_Log;
 
-  static std::vector<std::vector<std::uint8_t>> splitIntoLines(const std::vector<std::uint8_t>& bytes) {
-    std::vector<std::vector<std::uint8_t>> lines;
-    std::vector<std::uint8_t> currentLine;
-    currentLine.reserve(256);
-
-    for (const auto byte : bytes) {
-      currentLine.push_back(byte);
-      if (byte == 0x0A) {
-        lines.push_back(std::move(currentLine));
-        currentLine.clear();
+  static std::string shellQuote(const std::string& value) {
+    std::string quoted = "'";
+    for (const char character : value) {
+      if (character == '\'') {
+        quoted += "'\\''";
+      } else {
+        quoted += character;
       }
     }
+    quoted += "'";
+    return quoted;
+  }
 
-    if (!currentLine.empty()) {
-      lines.push_back(std::move(currentLine));
+  static std::vector<std::filesystem::path> collectGeneratedPages(const std::filesystem::path& pdfFolder) {
+    if (!std::filesystem::exists(pdfFolder) || !std::filesystem::is_directory(pdfFolder)) {
+      return {};
     }
 
-    return lines;
-  }
-
-  static bool isAxleStartLine(const std::vector<std::uint8_t>& line) {
-    return line.size() >= 2 && line[0] == 0x1B && line[1] == 0x45;
-  }
-
-  static std::size_t measureCursorY(const std::vector<std::vector<std::uint8_t>>& lines) {
-    ESCP2Renderer measurementRenderer([](size_t, size_t, uint8_t) {});
-    for (const auto& line : lines) {
-      measurementRenderer.addBytes(line.begin(), line.end());
-    }
-    return measurementRenderer.cursorY();
-  }
-
-  static std::optional<std::size_t> findLastAxleSplitLineIndex(const std::vector<std::vector<std::uint8_t>>& lines) {
-    std::optional<std::size_t> splitLineIndex;
-    for (std::size_t lineIndex = 1; lineIndex < lines.size(); ++lineIndex) {
-      if (isAxleStartLine(lines[lineIndex])) {
-        splitLineIndex = lineIndex;
+    std::vector<std::filesystem::path> pdfPages;
+    for (const auto& entry : std::filesystem::directory_iterator(pdfFolder)) {
+      if (!entry.is_regular_file()) {
+        continue;
+      }
+      if (entry.path().extension() == ".pdf") {
+        pdfPages.push_back(entry.path());
       }
     }
-    return splitLineIndex;
+    std::sort(pdfPages.begin(), pdfPages.end());
+    return pdfPages;
   }
 
-  static RenderedPage renderPage(const std::vector<std::vector<std::uint8_t>>& lines, std::size_t pageIndex) {
-    RenderedPage renderedPage;
-    renderedPage.pageIndex = pageIndex;
-
-    ESCP2Renderer escRenderer([&renderedPage](size_t x, size_t y, uint8_t colour) {
-      setPixelPacked(renderedPage.pixels, 1088, static_cast<int>(x), static_cast<int>(y), (colour == 0));
-    });
-
-    for (const auto& line : lines) {
-      escRenderer.addBytes(line.begin(), line.end());
-    }
-
-    return renderedPage;
+  static void cleanupPdfFolder(const std::filesystem::path& pdfFolder) {
+    std::error_code removalError;
+    std::filesystem::remove_all(pdfFolder, removalError);
   }
 
-
-  static void setPixelPacked(std::vector<uint8_t>& buffer,
-                      uint16_t width,
-                      int x,
-                      int y,
-                      bool set)
-  {
-    if (x < 0 || y < 0 || width == 0) {
-      return;
+  void runCommand(const std::string& command, const std::string& failureMessage) const {
+    if (m_Log) {
+      m_Log->information("[PrnRenderer Info]: Executing command: " + command);
     }
-
-    const int bytesPerRow = (width + 7) / 8;
-
-    if (x >= width) {
-      return;
-    }
-
-    // Ensure buffer is large enough for row y
-    const size_t requiredSize = static_cast<size_t>(y + 1) * bytesPerRow;
-    if (buffer.size() < requiredSize) {
-      buffer.resize(requiredSize, 0xFF);
-    }
-
-    const int byteIndex = x / 8;
-    const int bitIndex  = x % 8;
-
-    const size_t offset = static_cast<size_t>(y) * bytesPerRow + byteIndex;
-
-    const uint8_t mask = static_cast<uint8_t>(1u << bitIndex);
-
-    if (set) {
-      buffer[offset] &= static_cast<uint8_t>(~mask);
+    const int commandExitCode = std::system(command.c_str());
+    if (commandExitCode != 0) {
+      throw std::runtime_error(failureMessage + " Exit code: " + std::to_string(commandExitCode));
     }
   }
 };
