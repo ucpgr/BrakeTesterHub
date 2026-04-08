@@ -18,6 +18,7 @@
 
 #include "brake_tester/interfaces.hpp"
 #include "brake_tester/logging.hpp"
+#include "brake_tester/ESCP2Renderer.h"
 
 namespace brake_tester {
 
@@ -48,8 +49,7 @@ public:
 
   std::vector<std::uint8_t> captureTransmission(const std::atomic_bool& shouldKeepRunning) override {
     const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
-    const auto endOfTransmissionSilenceTimeout =
-        std::max(serialSettings.silenceTimeout * 20, std::chrono::milliseconds(5000));
+    const auto endOfTransmissionSilenceTimeout = serialSettings.silenceTimeout;
     std::vector<std::uint8_t> transmissionBuffer;
     transmissionBuffer.reserve(2048);
 
@@ -280,14 +280,55 @@ public:
     }
     RenderedPage renderedPage;
     renderedPage.pageIndex = 0;
-    renderedPage.width = 1;
-    renderedPage.height = patchedBytes.size();
-    renderedPage.pixels = patchedBytes;
+
+    ESCP2Renderer escRenderer([&renderedPage](size_t x, size_t y, uint8_t colour)
+    {
+      setPixelPacked(renderedPage.pixels, 1088, x, y, (colour == 0 ? true : false));
+    });
+
+    escRenderer.addBytes(patchedBytes.begin(), patchedBytes.end());
+
+
     return {std::move(renderedPage)};
   }
 
 private:
   SharedLogger m_Log;
+
+
+  static void setPixelPacked(std::vector<uint8_t>& buffer,
+                      uint16_t width,
+                      int x,
+                      int y,
+                      bool set)
+  {
+    if (x < 0 || y < 0 || width == 0) {
+      return;
+    }
+
+    const int bytesPerRow = (width + 7) / 8;
+
+    if (x >= width) {
+      return;
+    }
+
+    // Ensure buffer is large enough for row y
+    const size_t requiredSize = static_cast<size_t>(y + 1) * bytesPerRow;
+    if (buffer.size() < requiredSize) {
+      buffer.resize(requiredSize, 0xFF);
+    }
+
+    const int byteIndex = x / 8;
+    const int bitIndex  = x % 8;
+
+    const size_t offset = static_cast<size_t>(y) * bytesPerRow + byteIndex;
+
+    const uint8_t mask = static_cast<uint8_t>(1u << bitIndex);
+
+    if (set) {
+      buffer[offset] &= static_cast<uint8_t>(~mask);
+    }
+  }
 };
 
 class RenderedDocumentWriter final : public IRenderedDocumentWriter {
@@ -296,15 +337,16 @@ public:
       : m_OutputDirectory(std::move(outputDirectory)), m_Log(std::move(log)) {}
 
   void writePages(const std::vector<RenderedPage>& pages, const std::string& documentId) override {
-    if (m_Log) {
-      m_Log->information("[RenderedDocumentWriter Info]: Writing rendered pages to disk.");
-    }
     std::filesystem::create_directories(m_OutputDirectory);
 
     for (const auto& renderedPage : pages) {
       std::ostringstream filenameStream;
       filenameStream << documentId << "_page_" << renderedPage.pageIndex << ".bin";
       const std::filesystem::path fullPath = m_OutputDirectory / filenameStream.str();
+
+      if (m_Log) {
+        m_Log->information("[RenderedDocumentWriter Info]: Writing rendered pages at: " + fullPath.string());
+      }
 
       std::ofstream outputStream(fullPath, std::ios::binary);
       outputStream.write(reinterpret_cast<const char*>(renderedPage.pixels.data()),

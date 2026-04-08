@@ -33,10 +33,10 @@ public:
 
     auto listener = std::make_unique<LptListener>(*m_SettingsRepository, *m_LptStore, m_Log);
     auto patcher = std::make_unique<PrnPatcher>(*m_SelectedVehicleStore, m_Log);
-    patcher->addPatch(0x45F, [](const VehicleSelection&) { return std::string("patched"); });
+    //patcher->addPatch(0x45F, [](const VehicleSelection&) { return std::string("patched"); });
 
     auto renderer = std::make_unique<PrnRenderer>(m_Log);
-    auto writer = std::make_unique<RenderedDocumentWriter>("output", m_Log);
+    auto writer = std::make_unique<RenderedDocumentWriter>("tests", m_Log);
     auto prnWriter = std::make_unique<PrnWriter>(".", m_Log);
 
     m_LptManager = std::make_unique<LptManager>(std::move(listener),
