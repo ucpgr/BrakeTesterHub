@@ -282,7 +282,7 @@ public:
 
     const std::string prnFilePathString = prnFilePath.string();
     const std::string renderCommand =
-        "printerToPDF -8 -o tests/ -f font2/Epson-PC437-US.C16 " + shellQuote(prnFilePathString);
+        "printerToPDF -8 -o tests/ -f /opt/font2/Epson-PC437-US.C16 " + shellQuote(prnFilePathString);
     runCommand(renderCommand, "[PrnRenderer Error]: Failed to render prn with printerToPDF.");
 
     const auto pagePdfPaths = collectGeneratedPages(pdfFolder);
