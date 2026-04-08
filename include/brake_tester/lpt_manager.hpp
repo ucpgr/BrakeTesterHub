@@ -64,7 +64,7 @@ public:
 
           auto patchedBytes = m_Patcher->patch(incomingBytes);
           auto renderedPages = m_Renderer->render(patchedBytes);
-          m_Writer->writePages(renderedPages, "capture");
+          m_Writer->writePages(renderedPages, captureFilename);
           m_PrnWriter->writePrn(patchedBytes, captureFilename);
         } catch (const std::exception& processingException) {
           if (m_Log) {
