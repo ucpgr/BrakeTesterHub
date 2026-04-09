@@ -25,6 +25,9 @@ LibSerial::BaudRate toBaudRate(std::uint32_t baudRateValue) {
 LptListener::LptListener(const ISettingsRepository& settingsRepository, ILptStore& lptStore, SharedLogger log)
     : m_SettingsRepository(settingsRepository), m_LptStore(lptStore), m_Log(std::move(log)) {
   m_LptStore.setListenerStatus(LptListenerStatus::Idle);
+  if (m_Log) {
+    m_Log->information("[LptListener Info]: Initialized and listener status set to Idle.");
+  }
 }
 
 LptListener::~LptListener() {
@@ -38,6 +41,9 @@ std::vector<std::uint8_t> LptListener::captureTransmission(const std::atomic_boo
   transmissionBuffer.reserve(2048);
 
   ensureSerialPortOpen(serialSettings);
+  if (m_Log) {
+    m_Log->information("[LptListener Info]: Waiting for serial bytes on " + serialSettings.devicePath + ".");
+  }
 
   bool hasCapturedData = false;
   auto captureStartTimestamp = std::chrono::steady_clock::now();
@@ -59,6 +65,10 @@ std::vector<std::uint8_t> LptListener::captureTransmission(const std::atomic_boo
       if (isReadTimeout) {
         if (hasCapturedData &&
             (std::chrono::steady_clock::now() - lastCapturedDataTimestamp) >= endOfTransmissionSilenceTimeout) {
+          if (m_Log) {
+            m_Log->information("[LptListener Info]: Capture complete after silence timeout. Bytes: " +
+                               std::to_string(transmissionBuffer.size()));
+          }
           m_LptStore.setListenerStatus(LptListenerStatus::Idle);
           return transmissionBuffer;
         }
@@ -84,6 +94,9 @@ std::vector<std::uint8_t> LptListener::captureTransmission(const std::atomic_boo
       if (!hasCapturedData) {
         captureStartTimestamp = std::chrono::steady_clock::now();
         m_LptStore.setListenerStatus(LptListenerStatus::CaptureStarted);
+        if (m_Log) {
+          m_Log->information("[LptListener Info]: Capture started.");
+        }
       }
       hasCapturedData = true;
       lastCapturedDataTimestamp = std::chrono::steady_clock::now();
@@ -93,6 +106,10 @@ std::vector<std::uint8_t> LptListener::captureTransmission(const std::atomic_boo
 
     if (hasCapturedData &&
         (std::chrono::steady_clock::now() - lastCapturedDataTimestamp) >= endOfTransmissionSilenceTimeout) {
+      if (m_Log) {
+        m_Log->information("[LptListener Info]: Capture complete after inactivity. Bytes: " +
+                           std::to_string(transmissionBuffer.size()));
+      }
       m_LptStore.setListenerStatus(LptListenerStatus::Idle);
       return transmissionBuffer;
     }
@@ -120,6 +137,9 @@ void LptListener::test() {
   ensureSerialPortOpen(serialSettings);
   const char testByte = 't';
   m_SerialPort.WriteByte(testByte);
+  if (m_Log) {
+    m_Log->information("[LptListener Info]: Wrote test byte 't' to serial device.");
+  }
 }
 
 void LptListener::ensureSerialPortOpen(const SerialSettings& serialSettings) {
@@ -129,10 +149,16 @@ void LptListener::ensureSerialPortOpen(const SerialSettings& serialSettings) {
   }
 
   closeSerialPortIfOpen();
+  if (m_Log) {
+    m_Log->information("[LptListener Info]: Opening serial device: " + serialSettings.devicePath);
+  }
   m_SerialPort.Open(serialSettings.devicePath);
   m_SerialPort.SetBaudRate(toBaudRate(serialSettings.baudRate));
   m_IsSerialPortOpen = true;
   m_OpenDevicePath = serialSettings.devicePath;
+  if (m_Log) {
+    m_Log->information("[LptListener Info]: Serial device opened.");
+  }
 }
 
 void LptListener::closeSerialPortIfOpen() {
@@ -142,6 +168,9 @@ void LptListener::closeSerialPortIfOpen() {
   m_SerialPort.Close();
   m_IsSerialPortOpen = false;
   m_OpenDevicePath.clear();
+  if (m_Log) {
+    m_Log->information("[LptListener Info]: Serial device closed.");
+  }
 }
 
 } // namespace brake_tester

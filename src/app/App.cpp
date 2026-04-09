@@ -14,10 +14,12 @@ namespace brake_tester {
 
 App::App(std::string databasePath) {
   m_Log = std::make_shared<Logger>(LogVerbosity::Information);
+  m_Log->information("[App Info]: Initializing BrakeTesterHub application.");
 
   if (sqlite3_open(databasePath.c_str(), &m_DatabaseHandle) != SQLITE_OK) {
     throw std::runtime_error("Failed to open sqlite database");
   }
+  m_Log->information("[App Info]: Opened sqlite database at path: " + databasePath);
 
   m_SettingsRepository = std::make_unique<SettingsRepository>(m_DatabaseHandle, m_Log);
   m_LptRepository = std::make_unique<LptRepository>(m_DatabaseHandle, m_Log);
@@ -38,6 +40,7 @@ App::App(std::string databasePath) {
                                               m_Log);
 
   m_HttpServer = std::make_unique<BrakeTesterHttpServer>(*m_LptStore, m_Log, "0.0.0.0", 8080, "www");
+  m_Log->information("[App Info]: Runtime modules constructed successfully.");
 }
 
 App::~App() {
@@ -45,6 +48,9 @@ App::~App() {
 }
 
 void App::run() {
+  if (m_Log) {
+    m_Log->information("[App Info]: Starting runtime modules.");
+  }
   m_LptManager->start();
   m_HttpServer->start();
   startInputListener();
@@ -52,6 +58,9 @@ void App::run() {
 
 void App::shutdown() {
   m_IsInputListening = false;
+  if (m_Log) {
+    m_Log->information("[App Info]: Shutting down runtime modules.");
+  }
 
   if (m_HttpServer) {
     m_HttpServer->stop();
@@ -64,6 +73,9 @@ void App::shutdown() {
   if (m_DatabaseHandle != nullptr) {
     sqlite3_close(m_DatabaseHandle);
     m_DatabaseHandle = nullptr;
+    if (m_Log) {
+      m_Log->information("[App Info]: Closed sqlite database handle.");
+    }
   }
 }
 
@@ -73,6 +85,9 @@ void App::startInputListener() {
   }
 
   std::thread([this]() {
+    if (m_Log) {
+      m_Log->information("[App Info]: Input listener active. Type 't' and press Enter for test signal.");
+    }
     std::string consoleInput;
     while (m_IsInputListening) {
       if (!std::getline(std::cin, consoleInput)) {

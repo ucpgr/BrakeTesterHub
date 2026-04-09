@@ -24,7 +24,11 @@ LptManager::LptManager(std::unique_ptr<ILptListener> listener,
       m_PrnWriter(std::move(prnWriter)),
       m_LptStore(lptStore),
       m_SettingsRepository(settingsRepository),
-      m_Log(std::move(log)) {}
+      m_Log(std::move(log)) {
+  if (m_Log) {
+    m_Log->information("[LptManager Info]: Constructed.");
+  }
+}
 
 LptManager::~LptManager() {
   stop();
@@ -32,7 +36,18 @@ LptManager::~LptManager() {
 
 void LptManager::start() {
   if (m_IsRunning.exchange(true)) {
+    if (m_Log) {
+      m_Log->warning("[LptManager Warning]: Start requested while already running.");
+    }
     return;
+  }
+  if (m_Log) {
+    const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
+    m_Log->information("[LptManager Info]: Starting worker thread.");
+    m_Log->information("[LptManager Info]: Serial settings -> devicePath=" + serialSettings.devicePath +
+                       ", baudRate=" + std::to_string(serialSettings.baudRate) + ", readChunkSize=" +
+                       std::to_string(serialSettings.readChunkSize) + ", silenceTimeoutMs=" +
+                       std::to_string(serialSettings.silenceTimeout.count()));
   }
 
   m_WorkerThread = std::thread([this] {
@@ -43,22 +58,39 @@ void LptManager::start() {
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
           continue;
         }
+        if (m_Log) {
+          m_Log->information("[LptManager Info]: Data transfer started. Captured bytes: " +
+                             std::to_string(incomingBytes.size()));
+        }
 
         m_LptStore.setProcessStatus(LptProcessStatus::TransferStarted);
         const auto captureFilename = generateCaptureFilenameWithoutExtension();
         m_LptStore.setCurrentCaptureFilename(captureFilename);
+        if (m_Log) {
+          m_Log->information("[LptManager Info]: Capture file key assigned: " + captureFilename);
+        }
 
         auto patchedBytes = m_Patcher->patch(incomingBytes);
         m_LptStore.setProcessStatus(LptProcessStatus::DataPatched);
+        if (m_Log) {
+          m_Log->information("[LptManager Info]: Data patched. Output bytes: " + std::to_string(patchedBytes.size()));
+        }
 
         m_PrnWriter->writePrn(patchedBytes, captureFilename);
 
         m_LptStore.setProcessStatus(LptProcessStatus::ConversionStarted);
+        if (m_Log) {
+          m_Log->information("[LptManager Info]: Conversion started for: " + captureFilename + ".prn");
+        }
         m_Renderer->render(std::filesystem::path(captureFilename).concat(".prn"));
         m_LptStore.setProcessStatus(LptProcessStatus::ConversionFinished);
+        if (m_Log) {
+          m_Log->information("[LptManager Info]: Conversion finished for: " + captureFilename + ".prn");
+        }
       } catch (const std::exception& processingException) {
         if (m_Log) {
           m_Log->Error(processingException.what());
+          m_Log->information("[LptManager Info]: Retrying in 10 seconds.");
         }
 
         constexpr auto retryWaitDuration = std::chrono::seconds(10);
@@ -75,7 +107,13 @@ void LptManager::start() {
 
 void LptManager::stop() {
   if (!m_IsRunning.exchange(false)) {
+    if (m_Log) {
+      m_Log->warning("[LptManager Warning]: Stop requested while not running.");
+    }
     return;
+  }
+  if (m_Log) {
+    m_Log->information("[LptManager Info]: Stopping worker thread.");
   }
 
   if (m_WorkerThread.joinable()) {
@@ -84,7 +122,16 @@ void LptManager::stop() {
 }
 
 void LptManager::sendTestSignal() {
-  m_Listener->test();
+  try {
+    m_Listener->test();
+    if (m_Log) {
+      m_Log->information("[LptManager Info]: Test signal sent.");
+    }
+  } catch (const std::exception& testException) {
+    if (m_Log) {
+      m_Log->Error(std::string("[LptManager Error]: Failed to send test signal. ") + testException.what());
+    }
+  }
 }
 
 std::string LptManager::generateCaptureFilenameWithoutExtension() {

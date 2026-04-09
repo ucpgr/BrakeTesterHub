@@ -6,9 +6,16 @@
 
 namespace brake_tester {
 
-PrnRenderer::PrnRenderer(SharedLogger log) : m_Log(std::move(log)) {}
+PrnRenderer::PrnRenderer(SharedLogger log) : m_Log(std::move(log)) {
+  if (m_Log) {
+    m_Log->information("[PrnRenderer Info]: Initialized.");
+  }
+}
 
 void PrnRenderer::render(const std::filesystem::path& prnFilePath) {
+  if (m_Log) {
+    m_Log->information("[PrnRenderer Info]: Rendering PRN file: " + prnFilePath.string());
+  }
   const std::filesystem::path pdfFolder = std::filesystem::path("tests") / "pdf";
   cleanupPdfFolder(pdfFolder);
 
@@ -28,6 +35,9 @@ void PrnRenderer::render(const std::filesystem::path& prnFilePath) {
   }
   mergeCommand += " " + shellQuote(prnFilePathString + ".pdf");
   runCommand(mergeCommand, "[PrnRenderer Error]: Failed to merge rendered PDFs with pdfunite.");
+  if (m_Log) {
+    m_Log->information("[PrnRenderer Info]: Render complete. Output: " + prnFilePath.string() + ".pdf");
+  }
 
   cleanupPdfFolder(pdfFolder);
 }
@@ -66,6 +76,9 @@ void PrnRenderer::cleanupPdfFolder(const std::filesystem::path& pdfFolder) {
 }
 
 void PrnRenderer::runCommand(const std::string& command, const std::string& failureMessage) const {
+  if (m_Log) {
+    m_Log->information("[PrnRenderer Info]: Executing command: " + command);
+  }
   const int commandExitCode = std::system(command.c_str());
   if (commandExitCode != 0) {
     throw std::runtime_error(failureMessage + " Exit code: " + std::to_string(commandExitCode));

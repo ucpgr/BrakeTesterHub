@@ -17,7 +17,12 @@ BrakeTesterHttpServer::BrakeTesterHttpServer(ILptStore& lptStore,
       m_Host(std::move(host)),
       m_Port(port),
       m_StaticRoot(std::move(staticRoot)),
-      m_Server(std::make_unique<httplib::Server>()) {}
+      m_Server(std::make_unique<httplib::Server>()) {
+  if (m_Log) {
+    m_Log->information("[BrakeTesterHttpServer Info]: Constructed for " + m_Host + ":" + std::to_string(m_Port) +
+                       ", staticRoot=" + m_StaticRoot);
+  }
+}
 
 BrakeTesterHttpServer::~BrakeTesterHttpServer() {
   stop();
@@ -25,21 +30,37 @@ BrakeTesterHttpServer::~BrakeTesterHttpServer() {
 
 void BrakeTesterHttpServer::start() {
   if (m_IsRunning.exchange(true)) {
+    if (m_Log) {
+      m_Log->warning("[BrakeTesterHttpServer Warning]: Start requested while server already running.");
+    }
     return;
   }
 
   m_Server->set_mount_point("/", m_StaticRoot);
+  if (m_Log) {
+    m_Log->information("[BrakeTesterHttpServer Info]: Mounted static files at '/' from " + m_StaticRoot);
+  }
   configureLptModule();
   startLptBroadcastLoop();
 
   m_ServerThread = std::thread([this] {
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: HTTP server listening on " + m_Host + ":" +
+                         std::to_string(m_Port));
+    }
     m_Server->listen(m_Host, m_Port);
   });
 }
 
 void BrakeTesterHttpServer::stop() {
   if (!m_IsRunning.exchange(false)) {
+    if (m_Log) {
+      m_Log->warning("[BrakeTesterHttpServer Warning]: Stop requested while server not running.");
+    }
     return;
+  }
+  if (m_Log) {
+    m_Log->information("[BrakeTesterHttpServer Info]: Stopping HTTP server.");
   }
 
   if (m_Server) {
@@ -56,10 +77,17 @@ void BrakeTesterHttpServer::stop() {
 }
 
 void BrakeTesterHttpServer::configureLptModule() {
+  if (m_Log) {
+    m_Log->information("[BrakeTesterHttpServer Info]: Configuring LPT websocket module at /lpt.");
+  }
   m_Server->WebSocket("/lpt", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
     {
       std::scoped_lock lock(m_LptClientMutex);
       m_LptClients.insert(&socket);
+      if (m_Log) {
+        m_Log->information("[BrakeTesterHttpServer Info]: /lpt client connected. total=" +
+                           std::to_string(m_LptClients.size()));
+      }
     }
 
     std::string message;
@@ -69,6 +97,10 @@ void BrakeTesterHttpServer::configureLptModule() {
     {
       std::scoped_lock lock(m_LptClientMutex);
       m_LptClients.erase(&socket);
+      if (m_Log) {
+        m_Log->information("[BrakeTesterHttpServer Info]: /lpt client disconnected. total=" +
+                           std::to_string(m_LptClients.size()));
+      }
     }
   });
 }
@@ -90,6 +122,10 @@ void BrakeTesterHttpServer::startLptBroadcastLoop() {
       const auto payloadText = payload.dump();
 
       std::scoped_lock lock(m_LptClientMutex);
+      if (m_Log) {
+        m_Log->information("[BrakeTesterHttpServer Info]: Broadcasting LPT event to " +
+                           std::to_string(m_LptClients.size()) + " client(s): " + payloadText);
+      }
       for (auto* socket : m_LptClients) {
         if (socket != nullptr) {
           socket->send(payloadText);

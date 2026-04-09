@@ -9,6 +9,9 @@ LptRepository::LptRepository(sqlite3* databaseHandle, SharedLogger log)
   if (m_DatabaseHandle == nullptr) {
     throw std::invalid_argument("LptRepository requires a valid sqlite3 handle");
   }
+  if (m_Log) {
+    m_Log->information("[LptRepository Info]: Initializing schema.");
+  }
   initializeSchema();
 }
 
@@ -39,13 +42,23 @@ void LptRepository::initializeSchema() const {
   if (sqlite3_exec(m_DatabaseHandle, createTestsSql, nullptr, nullptr, &errorMessage) != SQLITE_OK) {
     const std::string message = (errorMessage != nullptr) ? errorMessage : "Unknown sqlite error";
     sqlite3_free(errorMessage);
+    if (m_Log) {
+      m_Log->Error("[LptRepository Error]: Failed to create tests table: " + message);
+    }
     throw std::runtime_error(message);
   }
 
   if (sqlite3_exec(m_DatabaseHandle, createAxleResultsSql, nullptr, nullptr, &errorMessage) != SQLITE_OK) {
     const std::string message = (errorMessage != nullptr) ? errorMessage : "Unknown sqlite error";
     sqlite3_free(errorMessage);
+    if (m_Log) {
+      m_Log->Error("[LptRepository Error]: Failed to create axle_results table: " + message);
+    }
     throw std::runtime_error(message);
+  }
+
+  if (m_Log) {
+    m_Log->information("[LptRepository Info]: Schema is ready (tests, axle_results).");
   }
 }
 

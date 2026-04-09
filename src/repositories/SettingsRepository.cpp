@@ -10,6 +10,9 @@ SettingsRepository::SettingsRepository(sqlite3* databaseHandle, SharedLogger log
   if (m_DatabaseHandle == nullptr) {
     throw std::invalid_argument("SettingsRepository requires a valid sqlite3 handle");
   }
+  if (m_Log) {
+    m_Log->information("[SettingsRepository Info]: Initializing.");
+  }
 
   initializeSchema();
   loadCachedSerialSettings();
@@ -24,6 +27,9 @@ void SettingsRepository::setSerialSettings(const SerialSettings& serialSettings)
   std::scoped_lock lock(m_Mutex);
   m_CachedSerialSettings = serialSettings;
   upsertCachedSerialSettings();
+  if (m_Log) {
+    m_Log->information("[SettingsRepository Info]: Updated and persisted serial settings.");
+  }
 }
 
 void SettingsRepository::initializeSchema() {
@@ -33,6 +39,9 @@ void SettingsRepository::initializeSchema() {
       "value TEXT NOT NULL"
       ");";
   executeSql(createTableSql);
+  if (m_Log) {
+    m_Log->information("[SettingsRepository Info]: Ensured LptSettings table exists.");
+  }
 }
 
 void SettingsRepository::loadCachedSerialSettings() {
@@ -48,6 +57,10 @@ void SettingsRepository::loadCachedSerialSettings() {
   const std::string readChunkSizeText =
       getSettingValueOrDefault("readChunkSize", std::to_string(m_CachedSerialSettings.readChunkSize));
   m_CachedSerialSettings.readChunkSize = static_cast<std::size_t>(std::strtoull(readChunkSizeText.c_str(), nullptr, 10));
+
+  if (m_Log) {
+    m_Log->information("[SettingsRepository Info]: Loaded cached serial settings.");
+  }
 }
 
 std::string SettingsRepository::getSettingValueOrDefault(const std::string& settingName, const std::string& defaultValue) const {
@@ -86,6 +99,10 @@ void SettingsRepository::upsertCachedSerialSettings() const {
   persistSetting(statement, "silenceTimeoutMs", std::to_string(m_CachedSerialSettings.silenceTimeout.count()));
   persistSetting(statement, "readChunkSize", std::to_string(m_CachedSerialSettings.readChunkSize));
   finalizeStatement(statement);
+
+  if (m_Log) {
+    m_Log->information("[SettingsRepository Info]: Persisted serial settings to sqlite.");
+  }
 }
 
 void SettingsRepository::resetStatement(sqlite3_stmt* statement) {
@@ -114,6 +131,9 @@ void SettingsRepository::executeSql(const char* sqlText) const {
   if (sqlite3_exec(m_DatabaseHandle, sqlText, nullptr, nullptr, &errorMessage) != SQLITE_OK) {
     const std::string sqliteError = (errorMessage != nullptr) ? errorMessage : "Unknown sqlite error";
     sqlite3_free(errorMessage);
+    if (m_Log) {
+      m_Log->Error("[SettingsRepository Error]: SQL execution failed: " + sqliteError);
+    }
     throw std::runtime_error(sqliteError);
   }
 }
