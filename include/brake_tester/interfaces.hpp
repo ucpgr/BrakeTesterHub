@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -17,6 +18,11 @@ public:
   virtual void setSerialSettings(const SerialSettings& serialSettings) = 0;
 };
 
+class ILptRepository {
+public:
+  virtual ~ILptRepository() = default;
+};
+
 class ISelectedVehicleStore {
 public:
   virtual ~ISelectedVehicleStore() = default;
@@ -31,6 +37,14 @@ public:
   virtual void setListenerStatus(LptListenerStatus status) = 0;
   virtual std::string getCurrentCaptureFilename() const = 0;
   virtual void setCurrentCaptureFilename(std::string filename) = 0;
+
+  virtual LptProcessStatus getProcessStatus() const = 0;
+  virtual void setProcessStatus(LptProcessStatus status) = 0;
+  virtual std::uint64_t getProcessStatusVersion() const = 0;
+  virtual bool waitForProcessStatusAfter(std::uint64_t afterVersion,
+                                         std::chrono::milliseconds timeout,
+                                         LptProcessStatus& status,
+                                         std::uint64_t& version) const = 0;
 };
 
 class ILptListener {
@@ -43,7 +57,7 @@ public:
 class IPrnPatcher {
 public:
   virtual ~IPrnPatcher() = default;
-  virtual std::vector<std::uint8_t> patch(const std::vector<std::uint8_t>& input_bytes) = 0;
+  virtual std::vector<std::uint8_t> patch(const std::vector<std::uint8_t>& inputBytes) = 0;
 };
 
 class IPrnRenderer {
@@ -55,7 +69,7 @@ public:
 class IRenderedDocumentWriter {
 public:
   virtual ~IRenderedDocumentWriter() = default;
-  virtual void writePages(const std::vector<RenderedPage>& pages, const std::string& document_id) = 0;
+  virtual void writePages(const std::vector<RenderedPage>& pages, const std::string& documentId) = 0;
 };
 
 class IPrnWriter {
