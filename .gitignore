@@ -1,3 +1,33 @@
 /build/
 *.db
 /output/
+
+
+# dependencies
+node_modules/
+
+# build output (if you ever build locally into frontend/)
+dist/
+build/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# environment variables
+.env
+.env.*
+!.env.example
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# vite cache
+.vite/
