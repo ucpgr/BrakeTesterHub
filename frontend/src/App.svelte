@@ -2,7 +2,6 @@
   import { currentRoute } from '$lib/stores/router';
   import TopBar from '$lib/components/TopBar/TopBar.svelte';
   import TelemetryCard from '$lib/components/TelemetryCard/TelemetryCard.svelte';
-  import VehicleCard from "$lib/components/VehicleCard/VehicleCard.svelte";
   import AxleResultsCard from "$lib/components/AxleResultsCard/AxleResultsCard.svelte";
 </script>
 
@@ -17,7 +16,6 @@
     <h1>History</h1>
   {:else}
     <h1>Home</h1>
-    <VehicleCard />
     <div class="grid md:grid-cols-[300px_1fr] gap-6">
       <TelemetryCard />
       <AxleResultsCard />
