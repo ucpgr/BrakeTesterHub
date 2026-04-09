@@ -16,6 +16,16 @@ include(FetchContent)
 find_package(Threads REQUIRED)
 
 # -------------------------------------------------
+# Nlohmann JSON
+# -------------------------------------------------
+FetchContent_Declare(
+     json
+     URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+)
+
+FetchContent_MakeAvailable(json)
+
+# -------------------------------------------------
 # cpp-httplib (header-only)
 # -------------------------------------------------
 FetchContent_Declare(
@@ -97,6 +107,7 @@ target_include_directories(BrakeTesterHub PRIVATE
 target_link_libraries(BrakeTesterHub PRIVATE
     ${SQLITE3_LIB}
     libserial_static
+    nlohmann_json::nlohmann_json
     Threads::Threads
 )
 
