@@ -4,15 +4,19 @@ import { writable, derived, get } from 'svelte/store';
    Core Stores
 ========================================================= */
 
-export const vehicles = writable([]);
-export const selectedVehicleId = writable(null);
+export const VehicleListStore = writable([]);
+export const SelectedVehicleStore = writable(null);
+
+// Backwards-compatible aliases
+export const vehicles = VehicleListStore;
+export const selectedVehicleId = SelectedVehicleStore;
 
 /* =========================================================
    Derived
 ========================================================= */
 
 export const selectedVehicle = derived(
-    [vehicles, selectedVehicleId],
+    [VehicleListStore, SelectedVehicleStore],
     ([$vehicles, $selectedVehicleId]) =>
         $vehicles.find(v => v.id === $selectedVehicleId) ?? null
 );
@@ -45,11 +49,11 @@ async function api(url, options = {}) {
  */
 export async function loadVehicles() {
     const data = await api('/api/vehicles');
-    vehicles.set(data);
+    VehicleListStore.set(data);
 
-    // auto-select first if none selected
-    if (!get(selectedVehicleId) && data.length > 0) {
-        selectedVehicleId.set(data[0].id);
+    const currentSelected = get(SelectedVehicleStore);
+    if (currentSelected && !data.some((v) => v.id === currentSelected)) {
+        SelectedVehicleStore.set(null);
     }
 }
 
@@ -63,7 +67,7 @@ export async function addVehicle(vehicle) {
         body: JSON.stringify(vehicle)
     });
 
-    vehicles.set(updated);
+    VehicleListStore.set(updated);
 }
 
 /**
@@ -75,7 +79,7 @@ export async function updateVehicle(id, vehicle) {
         body: JSON.stringify(vehicle)
     });
 
-    vehicles.set(updated);
+    VehicleListStore.set(updated);
 }
 
 /**
@@ -86,11 +90,11 @@ export async function removeVehicle(id) {
         method: 'DELETE'
     });
 
-    const current = get(vehicles).filter(v => v.id !== id);
-    vehicles.set(current);
+    const current = get(VehicleListStore).filter(v => v.id !== id);
+    VehicleListStore.set(current);
 
-    if (get(selectedVehicleId) === id) {
-        selectedVehicleId.set(current.length ? current[0].id : null);
+    if (get(SelectedVehicleStore) === id) {
+        SelectedVehicleStore.set(null);
     }
 }
 
@@ -98,5 +102,5 @@ export async function removeVehicle(id) {
  * Select vehicle
  */
 export function selectVehicle(id) {
-    selectedVehicleId.set(id);
+    SelectedVehicleStore.set(id || null);
 }
