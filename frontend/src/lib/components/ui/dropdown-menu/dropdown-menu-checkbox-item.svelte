@@ -4,9 +4,9 @@
 	import MinusIcon from "@lucide/svelte/icons/minus";
 	import { cn } from "$lib/utils.js";
 	let {
-		ref = $bindable(null),
-		checked = $bindable(false),
-		indeterminate = $bindable(false),
+		ref = $bindable(),
+		checked = $bindable(),
+		indeterminate = $bindable(),
 		class: className,
 		children: childrenProp,
 		...restProps

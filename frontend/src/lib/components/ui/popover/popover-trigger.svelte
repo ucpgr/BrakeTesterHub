@@ -3,7 +3,7 @@
 	import { Popover as PopoverPrimitive } from "bits-ui";
 
 	let {
-		ref = $bindable(null),
+		ref = $bindable(),
 		class: className,
 		...restProps
 	} = $props();

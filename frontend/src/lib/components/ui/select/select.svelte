@@ -2,7 +2,7 @@
 	import { Select as SelectPrimitive } from "bits-ui";
 
 	let {
-		open = $bindable(false),
+		open = $bindable(),
 		value = $bindable(),
 		...restProps
 	} = $props();
