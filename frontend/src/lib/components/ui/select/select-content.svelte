@@ -5,7 +5,7 @@
 	import SelectScrollDownButton from "./select-scroll-down-button.svelte";
 	import { cn } from "$lib/utils.js";
 	let {
-		ref = $bindable(null),
+		ref = $bindable(),
 		class: className,
 		sideOffset = 4,
 		portalProps,

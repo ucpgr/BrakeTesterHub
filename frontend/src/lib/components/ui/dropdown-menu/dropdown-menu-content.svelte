@@ -3,7 +3,7 @@
 	import DropdownMenuPortal from "./dropdown-menu-portal.svelte";
 	import { DropdownMenu as DropdownMenuPrimitive } from "bits-ui";
 	let {
-		ref = $bindable(null),
+		ref = $bindable(),
 		sideOffset = 4,
 		portalProps,
 		class: className,

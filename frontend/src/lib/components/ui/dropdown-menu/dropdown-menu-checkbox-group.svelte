@@ -2,8 +2,8 @@
 	import { DropdownMenu as DropdownMenuPrimitive } from "bits-ui";
 
 	let {
-		ref = $bindable(null),
-		value = $bindable([]),
+		ref = $bindable(),
+		value = $bindable(),
 		...restProps
 	} = $props();
 </script>
