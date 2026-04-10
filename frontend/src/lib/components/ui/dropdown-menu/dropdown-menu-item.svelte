@@ -3,7 +3,7 @@
 	import { DropdownMenu as DropdownMenuPrimitive } from "bits-ui";
 
 	let {
-		ref = $bindable(null),
+		ref = $bindable(),
 		class: className,
 		inset,
 		variant = "default",
