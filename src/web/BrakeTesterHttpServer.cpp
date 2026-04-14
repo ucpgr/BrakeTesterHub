@@ -165,8 +165,30 @@ void BrakeTesterHttpServer::configureVehicleModule() {
           vehicle.reg = vehiclePayload.value("reg", "");
           vehicle.make = vehiclePayload.value("make", "");
           vehicle.model = vehiclePayload.value("model", "");
-          vehicle.mileage = vehiclePayload.value("mileage", 0);
-          vehicle.mileageUnit = vehiclePayload.value("mileageUnit", "km");
+
+          if (vehiclePayload.contains("mileage") && vehiclePayload["mileage"].is_string()) {
+            const std::string mileageValue = vehiclePayload.value("mileage", "");
+            if (!mileageValue.empty()) {
+              vehicle.mileage = mileageValue;
+            }
+          } else if (vehiclePayload.contains("mileage") && vehiclePayload["mileage"].is_number()) {
+            const std::string mileageUnit = vehiclePayload.value("mileageUnit", "km");
+            std::string mileageValue;
+
+            if (vehiclePayload["mileage"].is_number_integer()) {
+              mileageValue = std::to_string(vehiclePayload.value("mileage", 0));
+            } else {
+              mileageValue = std::to_string(vehiclePayload.value("mileage", 0.0));
+              mileageValue.erase(mileageValue.find_last_not_of('0') + 1);
+              if (!mileageValue.empty() && mileageValue.back() == '.') {
+                mileageValue.pop_back();
+              }
+            }
+
+            if (!mileageValue.empty()) {
+              vehicle.mileage = mileageValue + mileageUnit;
+            }
+          }
 
           if (!vehicle.reg.empty() && !vehicle.make.empty() && !vehicle.model.empty()) {
             VehicleSelection created = m_VehicleRepository.addVehicle(vehicle);
@@ -214,14 +236,20 @@ nlohmann::json BrakeTesterHttpServer::buildVehicleStatePayload() const {
 
   nlohmann::json vehicleItems = nlohmann::json::array();
   for (const auto& vehicle : vehicles) {
-    vehicleItems.push_back({
+    nlohmann::json vehicleItem = {
         {"id", vehicle.id},
         {"reg", vehicle.reg},
         {"make", vehicle.make},
         {"model", vehicle.model},
-        {"mileage", vehicle.mileage},
-        {"mileageUnit", vehicle.mileageUnit},
-    });
+    };
+
+    if (vehicle.mileage.has_value()) {
+      vehicleItem["mileage"] = *vehicle.mileage;
+    } else {
+      vehicleItem["mileage"] = nullptr;
+    }
+
+    vehicleItems.push_back(vehicleItem);
   }
 
   const nlohmann::json selectedVehicleId = selectedVehicle.id > 0 ? nlohmann::json(selectedVehicle.id)

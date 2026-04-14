@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,8 +20,7 @@ struct VehicleSelection {
   std::string reg;
   std::string make;
   std::string model;
-  int mileage{0};
-  std::string mileageUnit{"km"};
+  std::optional<std::string> mileage;
 };
 
 struct RenderedPage {
