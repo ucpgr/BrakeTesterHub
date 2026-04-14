@@ -55,8 +55,13 @@
     });
 
     $: if ($selectedVehicle) {
-        mileageInput = Number($selectedVehicle.mileage ?? 0);
-        mileageUnitInput = $selectedVehicle.mileageUnit ?? 'km';
+        const mileageValue = ($selectedVehicle.mileage ?? '').toString().trim();
+        const mileageMatch = mileageValue.match(/^(\d+(?:\.\d+)?)\s*(km|m)$/i);
+
+        if (mileageMatch) {
+            mileageInput = Number(mileageMatch[1]);
+            mileageUnitInput = mileageMatch[2].toLowerCase();
+        }
     }
 
     function onVehicleChange(event) {
@@ -67,8 +72,6 @@
         regInput = '';
         makeInput = '';
         modelInput = '';
-        mileageInput = 0;
-        mileageUnitInput = 'km';
         showVehicleModal = true;
     }
 
@@ -82,9 +85,7 @@
         addVehicle({
             reg: regInput.trim(),
             make: makeInput.trim(),
-            model: modelInput.trim(),
-            mileage: Number(mileageInput) || 0,
-            mileageUnit: mileageUnitInput
+            model: modelInput.trim()
         });
 
         closeVehicleModal();
@@ -254,32 +255,6 @@
                     <input class="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Make" bind:value={makeInput} />
                     <input class="h-9 rounded-md border bg-background px-3 text-sm col-span-2" placeholder="Model" bind:value={modelInput} />
                 </div>
-
-                <div class="flex items-center gap-2 pt-1">
-                    <input
-                        type="number"
-                        min="0"
-                        class="h-9 w-28 rounded-md border bg-background px-3 text-sm"
-                        bind:value={mileageInput}
-                    />
-                    <div class="inline-flex items-center rounded-full border bg-muted p-0.5">
-                        <button
-                            type="button"
-                            class="h-7 min-w-[2.25rem] rounded-full px-2 text-xs font-medium transition-colors {mileageUnitInput === 'km' ? 'bg-background shadow-sm' : 'text-muted-foreground'}"
-                            onclick={() => (mileageUnitInput = 'km')}
-                        >
-                            km
-                        </button>
-                        <button
-                            type="button"
-                            class="h-7 min-w-[2.25rem] rounded-full px-2 text-xs font-medium transition-colors {mileageUnitInput === 'm' ? 'bg-background shadow-sm' : 'text-muted-foreground'}"
-                            onclick={() => (mileageUnitInput = 'm')}
-                        >
-                            m
-                        </button>
-                    </div>
-                </div>
-
                 <div class="flex justify-end gap-2 pt-3">
                     <Button variant="outline" onclick={closeVehicleModal}>Cancel</Button>
                     <Button variant="secondary" onclick={onAddVehicle}>Save</Button>
