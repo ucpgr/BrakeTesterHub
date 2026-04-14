@@ -11,7 +11,8 @@
         disconnectVehicleSocket,
         addVehicle,
         selectVehicle,
-        removeVehicle
+        removeVehicle,
+        updateVehicleMileage
     } from '$lib/stores/vehicles';
 
     import { Card, CardHeader, CardTitle, CardContent, CardAction } from '$lib/components/ui/card';
@@ -97,6 +98,22 @@
         removeVehicle(id);
     }
 
+    function buildMileagePayload() {
+        const numericMileage = Number(mileageInput);
+        if (!Number.isFinite(numericMileage) || numericMileage <= 0) {
+            return null;
+        }
+
+        return `${numericMileage}${mileageUnitInput}`;
+    }
+
+    function saveMileageUpdate() {
+        const id = get(SelectedVehicleStore);
+        if (!id) return;
+
+        updateVehicleMileage(id, buildMileagePayload());
+    }
+
 </script>
 
 <Card class="w-full" bind:ref={cardRef}>
@@ -131,19 +148,21 @@
                             min="0"
                             class="h-9 w-[86px] rounded-md border bg-background px-2 text-sm"
                             bind:value={mileageInput}
+                            onblur={saveMileageUpdate}
+                            onchange={saveMileageUpdate}
                         />
                         <div class="inline-flex items-center rounded-full border bg-muted p-0.5">
                             <button
                                 type="button"
                                 class="h-7 min-w-[2.25rem] rounded-full px-2 text-xs font-medium transition-colors {mileageUnitInput === 'km' ? 'bg-background shadow-sm' : 'text-muted-foreground'}"
-                                onclick={() => (mileageUnitInput = 'km')}
+                                onclick={() => { mileageUnitInput = 'km'; saveMileageUpdate(); }}
                             >
                                 km
                             </button>
                             <button
                                 type="button"
                                 class="h-7 min-w-[2.25rem] rounded-full px-2 text-xs font-medium transition-colors {mileageUnitInput === 'm' ? 'bg-background shadow-sm' : 'text-muted-foreground'}"
-                                onclick={() => (mileageUnitInput = 'm')}
+                                onclick={() => { mileageUnitInput = 'm'; saveMileageUpdate(); }}
                             >
                                 m
                             </button>
@@ -254,10 +273,6 @@
                     <input class="h-9 rounded-md border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground" placeholder="Reg" bind:value={regInput} />
                     <input class="h-9 rounded-md border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground" placeholder="Make" bind:value={makeInput} />
                     <input class="h-9 rounded-md border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground col-span-2" placeholder="Model" bind:value={modelInput} />
-                </div>
-                <div class="flex justify-end gap-2 pt-3">
-                    <Button variant="outline" onclick={closeVehicleModal}>Cancel</Button>
-                    <Button variant="secondary" onclick={onAddVehicle}>Save</Button>
                 </div>
                 <div class="flex justify-end gap-2 pt-3">
                     <Button variant="outline" onclick={closeVehicleModal}>Cancel</Button>

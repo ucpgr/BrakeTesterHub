@@ -37,10 +37,12 @@ public:
 private:
   void configureLptModule();
   void configureVehicleModule();
+  void configureStatusModule();
   void startLptBroadcastLoop();
   void broadcastVehicleState();
   nlohmann::json buildVehicleStatePayload() const;
   std::string lptEventNameForStatus(LptProcessStatus status) const;
+  void broadcastStatus(const std::string& level, const std::string& text);
 
   ILptStore& m_LptStore;
   IVehicleRepository& m_VehicleRepository;
@@ -60,6 +62,9 @@ private:
 
   std::mutex m_VehicleClientMutex;
   std::unordered_set<httplib::ws::WebSocket*> m_VehicleClients;
+
+  std::mutex m_StatusClientMutex;
+  std::unordered_set<httplib::ws::WebSocket*> m_StatusClients;
 };
 
 } // namespace brake_tester

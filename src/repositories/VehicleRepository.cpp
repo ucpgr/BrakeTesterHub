@@ -192,4 +192,33 @@ bool VehicleRepository::tryGetVehicle(int id, VehicleSelection& vehicle) const {
   return false;
 }
 
+
+bool VehicleRepository::updateVehicleMileage(int id, const std::optional<std::string>& mileage) {
+  std::scoped_lock lock(m_Mutex);
+
+  static constexpr const char* updateSql = "UPDATE Vehicles SET mileage = ? WHERE id = ?;";
+
+  sqlite3_stmt* statement = nullptr;
+  if (sqlite3_prepare_v2(m_DatabaseHandle, updateSql, -1, &statement, nullptr) != SQLITE_OK) {
+    throw std::runtime_error("Failed to prepare vehicle mileage update statement");
+  }
+
+  if (mileage.has_value() && !mileage->empty()) {
+    sqlite3_bind_text(statement, 1, mileage->c_str(), -1, SQLITE_TRANSIENT);
+  } else {
+    sqlite3_bind_null(statement, 1);
+  }
+
+  sqlite3_bind_int(statement, 2, id);
+
+  if (sqlite3_step(statement) != SQLITE_DONE) {
+    sqlite3_finalize(statement);
+    throw std::runtime_error("Failed to update vehicle mileage");
+  }
+
+  const int updatedRows = sqlite3_changes(m_DatabaseHandle);
+  sqlite3_finalize(statement);
+  return updatedRows > 0;
+}
+
 } // namespace brake_tester

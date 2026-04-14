@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -37,6 +38,7 @@ public:
   virtual VehicleSelection addVehicle(const VehicleSelection& vehicle) = 0;
   virtual bool deleteVehicle(int id) = 0;
   virtual bool tryGetVehicle(int id, VehicleSelection& vehicle) const = 0;
+  virtual bool updateVehicleMileage(int id, const std::optional<std::string>& mileage) = 0;
 };
 
 class ILptStore {
