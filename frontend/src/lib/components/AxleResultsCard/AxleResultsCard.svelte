@@ -104,7 +104,7 @@
 
         <CardAction class="row-span-1 row-start-1 self-center">
             {#if iconOnlyControls}
-                <Button size="icon" variant="secondary" aria-label="Add vehicle" on:click={openVehicleModal}>
+                <Button size="icon" variant="secondary" aria-label="Add vehicle" onclick={openVehicleModal}>
                     <Plus class="h-4 w-4" />
                 </Button>
             {:else}
@@ -116,7 +116,7 @@
                     <select
                         class="h-9 min-w-0 w-[220px] max-w-[42vw] rounded-md border bg-background px-3 text-sm transition-colors focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] {hasSelection ? 'border-emerald-400/70 ring-1 ring-emerald-300/40' : 'border-input'}"
                         bind:value={$SelectedVehicleStore}
-                        on:change={onVehicleChange}
+                        onchange={onVehicleChange}
                     >
                         <option value="">No vehicle</option>
                         {#each $VehicleListStore as vehicle}
@@ -135,21 +135,21 @@
                             <button
                                 type="button"
                                 class="h-7 min-w-[2.25rem] rounded-full px-2 text-xs font-medium transition-colors {mileageUnitInput === 'km' ? 'bg-background shadow-sm' : 'text-muted-foreground'}"
-                                on:click={() => (mileageUnitInput = 'km')}
+                                onclick={() => (mileageUnitInput = 'km')}
                             >
                                 km
                             </button>
                             <button
                                 type="button"
                                 class="h-7 min-w-[2.25rem] rounded-full px-2 text-xs font-medium transition-colors {mileageUnitInput === 'm' ? 'bg-background shadow-sm' : 'text-muted-foreground'}"
-                                on:click={() => (mileageUnitInput = 'm')}
+                                onclick={() => (mileageUnitInput = 'm')}
                             >
                                 m
                             </button>
                         </div>
                     </div>
 
-                    <Button size="icon" variant="secondary" aria-label="Add vehicle" on:click={openVehicleModal}>
+                    <Button size="icon" variant="secondary" aria-label="Add vehicle" onclick={openVehicleModal}>
                         <Plus class="h-4 w-4" />
                     </Button>
 
@@ -158,7 +158,7 @@
                         variant="destructive"
                         aria-label="Remove vehicle"
                         disabled={!$SelectedVehicleStore || $testState === 'running'}
-                        on:click={onRemoveVehicle}
+                        onclick={onRemoveVehicle}
                     >
                         <Trash2 class="h-4 w-4" />
                     </Button>
@@ -243,7 +243,7 @@
         <div class="w-full max-w-md rounded-lg border bg-background p-4 shadow-lg">
             <div class="mb-4 flex items-center justify-between">
                 <h3 class="text-sm font-semibold">Add vehicle</h3>
-                <Button size="icon" variant="ghost" aria-label="Close add vehicle dialog" on:click={closeVehicleModal}>
+                <Button size="icon" variant="ghost" aria-label="Close add vehicle dialog" onclick={closeVehicleModal}>
                     <X class="h-4 w-4" />
                 </Button>
             </div>
@@ -266,14 +266,14 @@
                         <button
                             type="button"
                             class="h-7 min-w-[2.25rem] rounded-full px-2 text-xs font-medium transition-colors {mileageUnitInput === 'km' ? 'bg-background shadow-sm' : 'text-muted-foreground'}"
-                            on:click={() => (mileageUnitInput = 'km')}
+                            onclick={() => (mileageUnitInput = 'km')}
                         >
                             km
                         </button>
                         <button
                             type="button"
                             class="h-7 min-w-[2.25rem] rounded-full px-2 text-xs font-medium transition-colors {mileageUnitInput === 'm' ? 'bg-background shadow-sm' : 'text-muted-foreground'}"
-                            on:click={() => (mileageUnitInput = 'm')}
+                            onclick={() => (mileageUnitInput = 'm')}
                         >
                             m
                         </button>
@@ -281,8 +281,8 @@
                 </div>
 
                 <div class="flex justify-end gap-2 pt-3">
-                    <Button variant="outline" on:click={closeVehicleModal}>Cancel</Button>
-                    <Button variant="secondary" on:click={onAddVehicle}>Save</Button>
+                    <Button variant="outline" onclick={closeVehicleModal}>Cancel</Button>
+                    <Button variant="secondary" onclick={onAddVehicle}>Save</Button>
                 </div>
             </div>
         </div>
