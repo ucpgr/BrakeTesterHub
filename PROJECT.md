@@ -1,329 +1,154 @@
-Project Design Decisions
+# Project Design Decisions
 
 This document captures the major design choices, constraints, and current direction of the project so future contributors and coding agents can work within the intended architecture.
 
-It is not a strict specification. It is a record of the design decisions made so far.
-
-
----
-
-1. Project purpose
-
-This project is a brake tester hub that bridges legacy brake tester hardware with a modern software interface.
-
-Goals:
-
-read live telemetry
-
-display data in a modern UI
-
-persist tests and artifacts
-
-capture and process legacy print output
-
-render modern printable formats
-
-run reliably on low-power hardware
-
-
+It is not a strict specification; it is a record of decisions made so far.
 
 ---
 
-2. Architectural direction
+## 1) Project purpose
+
+This project is a **Brake Tester Hub** that bridges legacy brake tester hardware with a modern software interface.
+
+### Goals
+
+- Read live telemetry.
+- Display data in a modern UI.
+- Persist tests and artifacts.
+- Capture and process legacy print output.
+- Render modern printable formats.
+- Run reliably on low-power hardware.
+
+---
+
+## 2) Architectural direction
 
 The system follows a modular architecture with clear boundaries.
 
-Key principle:
+### Core principle
 
-domain decides when
+> Domain decides **when**
+> Modules decide **how**
+> Repositories decide **where**
 
-modules decide how
-
-repositories decide where
-
-
-Avoid large architectural rewrites. Prefer small focused modules.
-
+Avoid large architectural rewrites. Prefer small, focused modules.
 
 ---
 
-3. Technology direction
+## 3) Technology direction
 
-Backend (preferred direction)
+### Backend (preferred)
 
-C++
+- C++
+- SQLite / `sqlite_orm`
+- `libserial`
+- `cpp-httplib`
 
-sqlite / sqlite_orm
+### Frontend (preferred)
 
-libserial
+- Svelte
+- Tailwind CSS
+- Dark-mode-first UI
 
-cpp-httplib
-
-
-Frontend
-
-Svelte (preferred)
-
-Tailwind CSS
-
-dark mode UI
-
-
-Node/SvelteKit was explored but introduced deployment complexity on Pi Zero.
-
+`Node/SvelteKit` was explored but introduced deployment complexity on Raspberry Pi Zero–class hardware.
 
 ---
 
-4. Deployment environment
+## 4) Deployment environment
 
-Target:
+### Target hardware
 
-Raspberry Pi Zero 2 W
+- Raspberry Pi Zero 2 W
 
+### Constraints
 
-Constraints:
-
-low resources
-
-simple deployment
-
-minimal runtime overhead
-
-
+- Low resources.
+- Simple deployment.
+- Minimal runtime overhead.
 
 ---
 
-5. Telemetry
+## 5) Telemetry
 
 Tracked data includes:
 
-brake forces (L/R)
+- Brake forces (L/R)
+- Axle weight
+- Wheel detection
+- Roller state
+- Derived efficiency
+- Imbalance
 
-axle weight
-
-wheel detection
-
-roller state
-
-derived efficiency
-
-imbalance
-
-
-UI must prioritise clarity.
-
+UI presentation must prioritize clarity over density.
 
 ---
 
-6. UI direction
+## 6) UI direction
 
-Preferred layout:
+### Preferred layout
 
-two large brake gauges
+- Two large brake gauges
+- Central imbalance indicator
+- Clear weight display
 
-central imbalance indicator
+### Design goals
 
-clear weight display
-
-
-Design goals:
-
-readable at a glance
-
-responsive
-
-minimal clutter
-
-
+- Readable at a glance
+- Responsive
+- Minimal clutter
 
 ---
 
-7. Print pipeline
-
-Core workflow:
-
-1. receive raw data
-
-
-2. patch (optional)
-
-
-3. render
-
-
-4. store
-
-
-5. print/display
-
-
+## 7) Print pipeline
 
 Pipeline-style architecture is preferred.
 
+### Core workflow
+
+1. Receive raw data.
+2. Patch (optional).
+3. Render.
+4. Store.
+5. Print/display.
 
 ---
 
-8. Serial/LPT capture
+## 8) Serial/LPT capture
 
-Listener requirements:
+### Listener requirements
 
-38400 baud
-
-detect transmission start
-
-end after ~2s inactivity
-
-single-threaded preferred
-
-return full buffer only when complete
-
-support test byte (t)
-
-
+- 38400 baud
+- Detect transmission start
+- End after ~2 seconds of inactivity
+- Single-threaded preferred
+- Return full buffer only when complete
+- Support test byte (`t`)
 
 ---
 
-9. Storage strategy
+## 9) Storage strategy
 
-SQLite for structured data
+- SQLite for structured data
+- Filesystem for artifacts
 
-filesystem for artifacts
-
-
-Prefer storing raw data for future reprocessing.
-
+Prefer storing raw data to support future reprocessing and improved renderers.
 
 ---
 
-10. Database philosophy
+## 10) Database philosophy
 
-avoid premature complexity
-
-prioritise reliable capture
-
-allow flexibility for future changes
-
-
+- Avoid premature complexity.
+- Prioritize reliable capture.
+- Preserve flexibility for future changes.
 
 ---
 
-11. Print artifacts
+## 11) Print artifacts
 
 Artifacts include:
 
-raw PRN
-
-patched PRN
-
-rendered pages (TIFF/PDF)
-
-
-Organised by time-based folders (e.g. year/month).
-
+- Raw PRN
+- Patched PRN
+- Rendered pages (TIFF/PDF)
 
 ---
-
-12. PDF thumbnail generation
-
-Handled as a small helper module.
-
-isolated responsibility
-
-no architectural impact
-
-
-
----
-
-13. UI workflow integration
-
-UI should support:
-
-current test status
-
-next vehicle selection
-
-compact top bar indicators
-
-
-
----
-
-14. Print status feedback
-
-Frontend should receive status updates:
-
-receiving
-
-converting
-
-printing
-
-
-Keep this lightweight.
-
-
----
-
-15. Performance philosophy
-
-Prefer:
-
-simple
-
-robust
-
-predictable
-
-
-over complex solutions.
-
-
----
-
-16. Contributor guidance
-
-preserve modular design
-
-avoid unnecessary abstraction
-
-keep deployment simple
-
-maintain clarity
-
-
-
----
-
-17. Flexible areas
-
-Still evolving:
-
-backend structure details
-
-repository interfaces
-
-rendering internals
-
-frontend/backend integration
-
-
-
----
-
-18. Summary
-
-The system is:
-
-modular
-
-practical
-
-hardware-aware
-
-C++-leaning backend
-
-Svelte-based UI
-
-
-Avoid unnecessary architectural churn.

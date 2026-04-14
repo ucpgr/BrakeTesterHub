@@ -1,337 +1,163 @@
-Coding Conventions
+# Coding Conventions
 
 This document defines coding standards and architectural conventions for the project.
 
-The goal is to ensure all code is consistent, readable, maintainable, and aligned with the system design.
-
+The goal is to keep code consistent, readable, maintainable, and aligned with the system design in `PROJECT.md`.
 
 ---
 
-1. General coding goals
+## 1) General coding goals
 
 Code should be:
 
-readable first
-
-modular
-
-easy to test
-
-explicit rather than clever
-
-maintainable under real-world conditions
-
+- Readable first
+- Modular
+- Easy to test
+- Explicit rather than clever
+- Maintainable under real-world conditions
 
 Avoid overly complex or abstract designs unless they clearly improve the system.
 
-
 ---
 
-2. Naming conventions
+## 2) Naming conventions
 
-Types
+### Types
 
-Use PascalCase:
+Use **PascalCase** for:
 
-classes
-
-structs
-
-concepts
-
-enums
-
+- Classes
+- Structs
+- Concepts
+- Enums
 
 Examples:
 
-LptListener
+- `LptListener`
+- `PrintArtifactRepository`
+- `RenderedPage`
 
-PrintArtifactRepository
+### Functions
 
-RenderedPage
+Use **camelCase**:
 
-
-
----
-
-Functions
-
-Use camelCase:
-
-getRawBytes()
-
-generateThumbnail()
-
-writeArtifacts()
-
+- `getRawBytes()`
+- `generateThumbnail()`
+- `writeArtifacts()`
 
 Functions should describe an action.
 
+### Variables
 
----
+Use **camelCase**:
 
-Variables
+- `pdfPath`
+- `vehicleData`
+- `maxWidth`
 
-Use camelCase:
+### Constants
 
-pdfPath
+Prefer `kPascalCase` (or clear `constexpr` naming):
 
-vehicleData
+- `kDefaultTimeoutMs`
+- `kSerialBaudRate`
 
-maxWidth
+### Private members (mandatory)
 
-
-
----
-
-Constants
-
-Prefer kPascalCase or clear constexpr naming:
-
-kDefaultTimeoutMs
-
-kSerialBaudRate
-
-
-
----
-
-Private members
-
-All private member variables must use the m_ prefix.
+All private member variables **must** use the `m_` prefix.
 
 Examples:
 
-m_port
+- `m_port`
+- `m_status`
+- `m_activePortId`
 
-m_status
+### Interfaces and concepts
 
-m_activePortId
+- Interfaces may use the `I` prefix (for example, `ILptSource`).
+- Concepts should use clean names (for example, `LptSource`).
 
-
-This rule is mandatory and must be consistent across the codebase.
-
-
----
-
-Interfaces and concepts
-
-Interfaces may use I prefix:
-
-ILptSource
-
-
-Concepts should use clean names:
-
-LptSource
-
-
-
----
-
-Files
+### Files
 
 Match file names to main types:
 
-LptListener.h
+- `LptListener.h`
+- `PrintArtifactRepository.cpp`
 
-PrintArtifactRepository.cpp
-
-
-Avoid vague names like utils.h unless justified.
-
+Avoid vague names like `utils.h` unless there is a clear, documented reason.
 
 ---
 
-3. Design patterns
+## 3) Design patterns
 
-Preferred
+### Preferred
 
-Composition over inheritance
+- **Composition over inheritance**: combine small classes rather than creating deep hierarchies.
+- **Manager/orchestrator**: managers coordinate workflows but should not implement everything.
+- **Repository pattern**: encapsulate persistence logic (for example, `SettingsRepository`, `PrintArtifactRepository`).
+- **Store pattern**: use small, focused state holders for UI-facing state.
+- **Pipeline pattern**: staged data processing (`source → patcher → renderer → writer`).
 
-Prefer combining small classes rather than deep hierarchies.
+### Avoid
 
-Manager / orchestrator
-
-Managers coordinate workflows but do not implement everything.
-
-Repository pattern
-
-Encapsulate persistence logic:
-
-SettingsRepository
-
-PrintArtifactRepository
-
-
-Store pattern
-
-Use small state holders for UI-facing state.
-
-Pipeline pattern
-
-Use pipeline flow for staged data processing:
-
-source → patcher → renderer → writer
-
+- Deep inheritance
+- God objects
+- Global mutable state
+- Over-engineering
+- Large generic utility files
 
 ---
 
-4. Patterns to avoid
-
-Avoid:
-
-deep inheritance
-
-god objects
-
-global mutable state
-
-over-engineering
-
-large generic utility files
-
-
-
----
-
-5. Function design
+## 4) Function design
 
 Functions should:
 
-do one thing
-
-be easy to test
-
-have clear inputs/outputs
-
+- Do one thing
+- Be easy to test
+- Have clear inputs and outputs
 
 Prefer explicit error handling over hidden failures.
 
-
 ---
 
-6. Class design
+## 5) Class design
 
 Each class should have one responsibility.
 
-Split classes if they start handling:
-
-hardware
-
-transformation
-
-persistence
-
-UI
-
-
-all at once.
-
+Split classes if they begin to handle hardware, transformation, persistence, and UI concerns all at once.
 
 ---
 
-7. Headers and sources
+## 6) Headers and source files
 
-headers = contracts
-
-source files = implementation
-
+- Headers = contracts
+- Source files = implementation
 
 Keep headers lightweight.
 
-
 ---
 
-8. Templates and concepts
+## 7) Templates and concepts
 
-Use carefully:
+Use these carefully:
 
-default to simple classes
-
-use templates where helpful
-
-use concepts for clarity
-
+- Default to simple classes.
+- Use templates where they clearly reduce duplication.
+- Use concepts where they improve clarity.
 
 Avoid complexity for its own sake.
 
-
 ---
 
-9. Dependencies
+## 8) Practical review checklist (recommended)
 
-Keep dependencies at system edges.
+Before opening a PR, quickly confirm:
 
-Avoid leaking implementation details across modules.
-
-
----
-
-10. Comments
-
-Write comments for:
-
-non-obvious behaviour
-
-hardware quirks
-
-protocol details
-
-
-Avoid redundant comments.
-
+- Naming follows this document.
+- New classes/functions have a single clear responsibility.
+- Errors are surfaced explicitly.
+- Persistence access stays in repositories.
+- New utilities are scoped and justified.
+- Headers do not pull in unnecessary dependencies.
 
 ---
-
-11. Testing
-
-Prefer:
-
-small testable units
-
-deterministic logic
-
-
-Test critical components like:
-
-protocol parsing
-
-rendering logic
-
-repositories
-
-
-
----
-
-12. Guidance for contributors
-
-follow naming rules strictly
-
-keep modules small and focused
-
-avoid unnecessary abstraction
-
-maintain pipeline clarity
-
-write debuggable code
-
-
-
----
-
-13. Summary
-
-The coding style is:
-
-clear
-
-modular
-
-practical
-
-consistent
-
-
-Code should feel like it belongs in a hardware-integrated, maintainable C++ system.
