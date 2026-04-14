@@ -8,11 +8,15 @@
 namespace brake_tester {
 
 BrakeTesterHttpServer::BrakeTesterHttpServer(ILptStore& lptStore,
+                                             IVehicleRepository& vehicleRepository,
+                                             ISelectedVehicleStore& selectedVehicleStore,
                                              SharedLogger log,
                                              std::string host,
                                              int port,
                                              std::string staticRoot)
     : m_LptStore(lptStore),
+      m_VehicleRepository(vehicleRepository),
+      m_SelectedVehicleStore(selectedVehicleStore),
       m_Log(std::move(log)),
       m_Host(std::move(host)),
       m_Port(port),
@@ -41,6 +45,7 @@ void BrakeTesterHttpServer::start() {
     m_Log->information("[BrakeTesterHttpServer Info]: Mounted static files at '/' from " + m_StaticRoot);
   }
   configureLptModule();
+  configureVehicleModule();
   startLptBroadcastLoop();
 
   m_ServerThread = std::thread([this] {
@@ -133,6 +138,110 @@ void BrakeTesterHttpServer::startLptBroadcastLoop() {
       }
     }
   });
+}
+
+void BrakeTesterHttpServer::configureVehicleModule() {
+  if (m_Log) {
+    m_Log->information("[BrakeTesterHttpServer Info]: Configuring vehicle websocket module at /vehicles.");
+  }
+
+  m_Server->WebSocket("/vehicles", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
+    {
+      std::scoped_lock lock(m_VehicleClientMutex);
+      m_VehicleClients.insert(&socket);
+    }
+
+    socket.send(buildVehicleStatePayload().dump());
+
+    std::string message;
+    while (m_IsRunning.load() && socket.read(message) != httplib::ws::Fail) {
+      try {
+        const auto payload = nlohmann::json::parse(message);
+        const std::string action = payload.value("action", "");
+
+        if (action == "add") {
+          const auto vehiclePayload = payload.at("vehicle");
+          VehicleSelection vehicle;
+          vehicle.reg = vehiclePayload.value("reg", "");
+          vehicle.make = vehiclePayload.value("make", "");
+          vehicle.model = vehiclePayload.value("model", "");
+          vehicle.mileage = vehiclePayload.value("mileage", 0);
+          vehicle.mileageUnit = vehiclePayload.value("mileageUnit", "km");
+
+          if (!vehicle.reg.empty() && !vehicle.make.empty() && !vehicle.model.empty()) {
+            VehicleSelection created = m_VehicleRepository.addVehicle(vehicle);
+            m_SelectedVehicleStore.setSelectedVehicle(created);
+            broadcastVehicleState();
+          }
+        } else if (action == "select") {
+          const int id = payload.value("id", 0);
+          if (id <= 0) {
+            m_SelectedVehicleStore.setSelectedVehicle({});
+          } else {
+            VehicleSelection selected;
+            if (m_VehicleRepository.tryGetVehicle(id, selected)) {
+              m_SelectedVehicleStore.setSelectedVehicle(selected);
+            }
+          }
+          broadcastVehicleState();
+        } else if (action == "delete") {
+          const int id = payload.value("id", 0);
+          if (id > 0 && m_VehicleRepository.deleteVehicle(id)) {
+            const VehicleSelection selected = m_SelectedVehicleStore.getSelectedVehicle();
+            if (selected.id == id) {
+              m_SelectedVehicleStore.setSelectedVehicle({});
+            }
+            broadcastVehicleState();
+          }
+        }
+      } catch (const std::exception& ex) {
+        if (m_Log) {
+          m_Log->warning(std::string("[BrakeTesterHttpServer Warning]: Invalid /vehicles message: ") + ex.what());
+        }
+      }
+    }
+
+    {
+      std::scoped_lock lock(m_VehicleClientMutex);
+      m_VehicleClients.erase(&socket);
+    }
+  });
+}
+
+nlohmann::json BrakeTesterHttpServer::buildVehicleStatePayload() const {
+  const auto vehicles = m_VehicleRepository.getVehicles();
+  const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
+
+  nlohmann::json vehicleItems = nlohmann::json::array();
+  for (const auto& vehicle : vehicles) {
+    vehicleItems.push_back({
+        {"id", vehicle.id},
+        {"reg", vehicle.reg},
+        {"make", vehicle.make},
+        {"model", vehicle.model},
+        {"mileage", vehicle.mileage},
+        {"mileageUnit", vehicle.mileageUnit},
+    });
+  }
+
+  const nlohmann::json selectedVehicleId = selectedVehicle.id > 0 ? nlohmann::json(selectedVehicle.id)
+                                                                 : nlohmann::json(nullptr);
+
+  return {
+      {"event", "vehicles.state"},
+      {"vehicles", vehicleItems},
+      {"selectedVehicleId", selectedVehicleId},
+  };
+}
+
+void BrakeTesterHttpServer::broadcastVehicleState() {
+  const std::string payload = buildVehicleStatePayload().dump();
+  std::scoped_lock lock(m_VehicleClientMutex);
+  for (auto* socket : m_VehicleClients) {
+    if (socket != nullptr) {
+      socket->send(payload);
+    }
+  }
 }
 
 std::string BrakeTesterHttpServer::lptEventNameForStatus(LptProcessStatus status) const {

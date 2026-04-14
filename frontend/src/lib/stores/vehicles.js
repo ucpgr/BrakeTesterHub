@@ -1,106 +1,72 @@
 import { writable, derived, get } from 'svelte/store';
 
-/* =========================================================
-   Core Stores
-========================================================= */
-
 export const VehicleListStore = writable([]);
 export const SelectedVehicleStore = writable(null);
 
-// Backwards-compatible aliases
-export const vehicles = VehicleListStore;
-export const selectedVehicleId = SelectedVehicleStore;
-
-/* =========================================================
-   Derived
-========================================================= */
+let vehicleSocket = null;
 
 export const selectedVehicle = derived(
     [VehicleListStore, SelectedVehicleStore],
     ([$vehicles, $selectedVehicleId]) =>
-        $vehicles.find(v => v.id === $selectedVehicleId) ?? null
+        $vehicles.find((vehicle) => vehicle.id === Number($selectedVehicleId)) ?? null
 );
 
-/* =========================================================
-   Internal Helpers
-========================================================= */
+function sendSocketMessage(payload) {
+    if (!vehicleSocket || vehicleSocket.readyState !== WebSocket.OPEN) return;
+    vehicleSocket.send(JSON.stringify(payload));
+}
 
-async function api(url, options = {}) {
-    const res = await fetch(url, {
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        ...options
-    });
-
-    if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`API error (${res.status}): ${text}`);
+export function connectVehicleSocket() {
+    if (vehicleSocket && (vehicleSocket.readyState === WebSocket.OPEN || vehicleSocket.readyState === WebSocket.CONNECTING)) {
+        return;
     }
 
-    return res.status === 204 ? null : res.json();
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    vehicleSocket = new WebSocket(`${protocol}//${window.location.host}/vehicles`);
+
+    vehicleSocket.onmessage = (event) => {
+        try {
+            const payload = JSON.parse(event.data);
+            if (payload.event !== 'vehicles.state') return;
+
+            VehicleListStore.set(Array.isArray(payload.vehicles) ? payload.vehicles : []);
+            SelectedVehicleStore.set(payload.selectedVehicleId ?? null);
+        } catch (error) {
+            console.warn('Failed to parse /vehicles message', error);
+        }
+    };
+
+    vehicleSocket.onclose = () => {
+        vehicleSocket = null;
+        setTimeout(() => {
+            connectVehicleSocket();
+        }, 1000);
+    };
 }
 
-/* =========================================================
-   Public API
-========================================================= */
-
-/**
- * Load vehicles from server
- */
-export async function loadVehicles() {
-    const data = await api('/api/vehicles');
-    VehicleListStore.set(data);
-
-    const currentSelected = get(SelectedVehicleStore);
-    if (currentSelected && !data.some((v) => v.id === currentSelected)) {
-        SelectedVehicleStore.set(null);
-    }
+export function disconnectVehicleSocket() {
+    if (!vehicleSocket) return;
+    vehicleSocket.close();
+    vehicleSocket = null;
 }
 
-/**
- * Add vehicle
- * vehicle = { reg, make, axles }
- */
-export async function addVehicle(vehicle) {
-    const updated = await api('/api/vehicles', {
-        method: 'POST',
-        body: JSON.stringify(vehicle)
-    });
-
-    VehicleListStore.set(updated);
+export function addVehicle(vehicle) {
+    sendSocketMessage({ action: 'add', vehicle });
 }
 
-/**
- * Update vehicle
- */
-export async function updateVehicle(id, vehicle) {
-    const updated = await api(`/api/vehicles/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(vehicle)
-    });
-
-    VehicleListStore.set(updated);
+export function removeVehicle(id) {
+    sendSocketMessage({ action: 'delete', id: Number(id) });
 }
 
-/**
- * Remove vehicle
- */
-export async function removeVehicle(id) {
-    await api(`/api/vehicles/${id}`, {
-        method: 'DELETE'
-    });
-
-    const current = get(VehicleListStore).filter(v => v.id !== id);
-    VehicleListStore.set(current);
-
-    if (get(SelectedVehicleStore) === id) {
-        SelectedVehicleStore.set(null);
-    }
-}
-
-/**
- * Select vehicle
- */
 export function selectVehicle(id) {
-    SelectedVehicleStore.set(id || null);
+    const parsedId = id ? Number(id) : null;
+    SelectedVehicleStore.set(parsedId);
+    sendSocketMessage({ action: 'select', id: parsedId });
+}
+
+export const vehicles = VehicleListStore;
+export const selectedVehicleId = SelectedVehicleStore;
+
+export function getCurrentSelectedVehicle() {
+    return get(selectedVehicle);
 }

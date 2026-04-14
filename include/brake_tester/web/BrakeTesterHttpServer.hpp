@@ -6,6 +6,8 @@
 #include <thread>
 #include <unordered_set>
 
+#include <nlohmann/json.hpp>
+
 #include "brake_tester/interfaces.hpp"
 #include "brake_tester/logging.hpp"
 
@@ -21,6 +23,8 @@ namespace brake_tester {
 class BrakeTesterHttpServer {
 public:
   BrakeTesterHttpServer(ILptStore& lptStore,
+                        IVehicleRepository& vehicleRepository,
+                        ISelectedVehicleStore& selectedVehicleStore,
                         SharedLogger log,
                         std::string host = "0.0.0.0",
                         int port = 8080,
@@ -32,10 +36,15 @@ public:
 
 private:
   void configureLptModule();
+  void configureVehicleModule();
   void startLptBroadcastLoop();
+  void broadcastVehicleState();
+  nlohmann::json buildVehicleStatePayload() const;
   std::string lptEventNameForStatus(LptProcessStatus status) const;
 
   ILptStore& m_LptStore;
+  IVehicleRepository& m_VehicleRepository;
+  ISelectedVehicleStore& m_SelectedVehicleStore;
   SharedLogger m_Log;
   std::string m_Host;
   int m_Port;
@@ -48,6 +57,9 @@ private:
   std::thread m_LptBroadcastThread;
   std::mutex m_LptClientMutex;
   std::unordered_set<httplib::ws::WebSocket*> m_LptClients;
+
+  std::mutex m_VehicleClientMutex;
+  std::unordered_set<httplib::ws::WebSocket*> m_VehicleClients;
 };
 
 } // namespace brake_tester

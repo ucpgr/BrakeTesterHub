@@ -30,6 +30,15 @@ public:
   virtual void setSelectedVehicle(const VehicleSelection& selectedVehicle) = 0;
 };
 
+class IVehicleRepository {
+public:
+  virtual ~IVehicleRepository() = default;
+  virtual std::vector<VehicleSelection> getVehicles() const = 0;
+  virtual VehicleSelection addVehicle(const VehicleSelection& vehicle) = 0;
+  virtual bool deleteVehicle(int id) = 0;
+  virtual bool tryGetVehicle(int id, VehicleSelection& vehicle) const = 0;
+};
+
 class ILptStore {
 public:
   virtual ~ILptStore() = default;

@@ -16,8 +16,11 @@ struct SerialSettings {
 
 struct VehicleSelection {
   int id{0};
-  std::string displayName;
-  std::string vin;
+  std::string reg;
+  std::string make;
+  std::string model;
+  int mileage{0};
+  std::string mileageUnit{"km"};
 };
 
 struct RenderedPage {
