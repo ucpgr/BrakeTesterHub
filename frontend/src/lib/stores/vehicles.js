@@ -61,6 +61,12 @@ export function removeVehicle(id) {
 export function selectVehicle(id) {
     const parsedId = id ? Number(id) : null;
     SelectedVehicleStore.set(parsedId);
+
+    if (parsedId === null || Number.isNaN(parsedId)) {
+        sendSocketMessage({ action: 'select' });
+        return;
+    }
+
     sendSocketMessage({ action: 'select', id: parsedId });
 }
 
