@@ -13,9 +13,12 @@ export default defineConfig({
     tailwindcss(),
     svelte()
   ],
+  build: {
+    outDir: path.resolve(__dirname, "../www")
+  },
   resolve: {
     alias: {
       $lib: path.resolve(__dirname, 'src/lib')
     }
   }
-});;
+});
