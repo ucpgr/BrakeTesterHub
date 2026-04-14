@@ -259,6 +259,10 @@
                     <Button variant="outline" onclick={closeVehicleModal}>Cancel</Button>
                     <Button variant="secondary" onclick={onAddVehicle}>Save</Button>
                 </div>
+                <div class="flex justify-end gap-2 pt-3">
+                    <Button variant="outline" onclick={closeVehicleModal}>Cancel</Button>
+                    <Button variant="secondary" onclick={onAddVehicle}>Save</Button>
+                </div>
             </div>
         </div>
     </div>
