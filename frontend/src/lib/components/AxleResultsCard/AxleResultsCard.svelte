@@ -241,7 +241,7 @@
 
 {#if showVehicleModal}
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
-        <div class="w-full max-w-md rounded-lg border bg-background p-4 shadow-lg">
+        <div class="w-full max-w-md rounded-lg border bg-background p-4 text-foreground shadow-lg">
             <div class="mb-4 flex items-center justify-between">
                 <h3 class="text-sm font-semibold">Add vehicle</h3>
                 <Button size="icon" variant="ghost" aria-label="Close add vehicle dialog" onclick={closeVehicleModal}>
@@ -251,9 +251,13 @@
 
             <div class="space-y-3">
                 <div class="grid grid-cols-2 gap-2">
-                    <input class="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Reg" bind:value={regInput} />
-                    <input class="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Make" bind:value={makeInput} />
-                    <input class="h-9 rounded-md border bg-background px-3 text-sm col-span-2" placeholder="Model" bind:value={modelInput} />
+                    <input class="h-9 rounded-md border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground" placeholder="Reg" bind:value={regInput} />
+                    <input class="h-9 rounded-md border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground" placeholder="Make" bind:value={makeInput} />
+                    <input class="h-9 rounded-md border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground col-span-2" placeholder="Model" bind:value={modelInput} />
+                </div>
+                <div class="flex justify-end gap-2 pt-3">
+                    <Button variant="outline" onclick={closeVehicleModal}>Cancel</Button>
+                    <Button variant="secondary" onclick={onAddVehicle}>Save</Button>
                 </div>
                 <div class="flex justify-end gap-2 pt-3">
                     <Button variant="outline" onclick={closeVehicleModal}>Cancel</Button>
