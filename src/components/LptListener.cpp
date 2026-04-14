@@ -1,12 +1,16 @@
 #include "brake_tester/components/LptListener.hpp"
 
+#include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <stdexcept>
 #include <thread>
 
 namespace brake_tester {
 
 namespace {
+constexpr std::size_t kMaxTransmissionBytes = 1024 * 1024;
+
 LibSerial::BaudRate toBaudRate(std::uint32_t baudRateValue) {
   switch (baudRateValue) {
     case 1200: return LibSerial::BaudRate::BAUD_1200;
@@ -19,6 +23,13 @@ LibSerial::BaudRate toBaudRate(std::uint32_t baudRateValue) {
     case 115200: return LibSerial::BaudRate::BAUD_115200;
     default: return LibSerial::BaudRate::BAUD_9600;
   }
+}
+
+bool isReadTimeoutError(std::string errorReason) {
+  std::transform(errorReason.begin(), errorReason.end(), errorReason.begin(), [](unsigned char character) {
+    return static_cast<char>(std::tolower(character));
+  });
+  return errorReason.find("timeout") != std::string::npos;
 }
 } // namespace
 
@@ -59,8 +70,7 @@ std::vector<std::uint8_t> LptListener::captureTransmission(const std::atomic_boo
       didReadByte = true;
     } catch (const std::exception& readException) {
       const std::string readErrorReason = readException.what();
-      const bool isReadTimeout =
-          (readErrorReason.find("timeout") != std::string::npos || readErrorReason.find("Timeout") != std::string::npos);
+      const bool isReadTimeout = isReadTimeoutError(readErrorReason);
 
       if (isReadTimeout) {
         if (hasCapturedData &&
@@ -100,6 +110,11 @@ std::vector<std::uint8_t> LptListener::captureTransmission(const std::atomic_boo
       }
       hasCapturedData = true;
       lastCapturedDataTimestamp = std::chrono::steady_clock::now();
+
+      if (transmissionBuffer.size() >= kMaxTransmissionBytes) {
+        throw std::runtime_error("[LptListener Error]: Capture exceeded maximum buffer size of " +
+                                 std::to_string(kMaxTransmissionBytes) + " bytes.");
+      }
       transmissionBuffer.push_back(capturedByte);
       continue;
     }
