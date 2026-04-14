@@ -22,6 +22,7 @@ App::App(std::string databasePath) {
   m_Log->information("[App Info]: Opened sqlite database at path: " + databasePath);
 
   m_SettingsRepository = std::make_unique<SettingsRepository>(m_DatabaseHandle, m_Log);
+  m_VehicleRepository = std::make_unique<VehicleRepository>(m_DatabaseHandle, m_Log);
   m_LptRepository = std::make_unique<LptRepository>(m_DatabaseHandle, m_Log);
   m_SelectedVehicleStore = std::make_unique<SelectedVehicleStore>();
   m_LptStore = std::make_unique<LptStore>();
@@ -39,7 +40,14 @@ App::App(std::string databasePath) {
                                               *m_SettingsRepository,
                                               m_Log);
 
-  m_HttpServer = std::make_unique<BrakeTesterHttpServer>(*m_LptStore, m_Log, "0.0.0.0", 8080, "www");
+  m_HttpServer = std::make_unique<BrakeTesterHttpServer>(
+      *m_LptStore,
+      *m_VehicleRepository,
+      *m_SelectedVehicleStore,
+      m_Log,
+      "0.0.0.0",
+      8080,
+      "www");
   m_Log->information("[App Info]: Runtime modules constructed successfully.");
 }
 

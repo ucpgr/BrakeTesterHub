@@ -13,6 +13,7 @@ namespace brake_tester {
 class LptManager;
 class BrakeTesterHttpServer;
 class SettingsRepository;
+class VehicleRepository;
 class LptRepository;
 class SelectedVehicleStore;
 class LptStore;
@@ -33,6 +34,7 @@ private:
   sqlite3* m_DatabaseHandle{nullptr};
 
   std::unique_ptr<SettingsRepository> m_SettingsRepository;
+  std::unique_ptr<VehicleRepository> m_VehicleRepository;
   std::unique_ptr<LptRepository> m_LptRepository;
   std::unique_ptr<SelectedVehicleStore> m_SelectedVehicleStore;
   std::unique_ptr<LptStore> m_LptStore;

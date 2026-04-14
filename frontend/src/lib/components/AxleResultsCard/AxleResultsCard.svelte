@@ -6,6 +6,10 @@
     import {
         VehicleListStore,
         SelectedVehicleStore,
+        selectedVehicle,
+        connectVehicleSocket,
+        disconnectVehicleSocket,
+        addVehicle,
         selectVehicle,
         removeVehicle
     } from '$lib/stores/vehicles';
@@ -19,6 +23,11 @@
     let cardRef;
     let cardWidth = 0;
     let showVehicleModal = false;
+    let regInput = '';
+    let makeInput = '';
+    let modelInput = '';
+    let mileageInput = 0;
+    let mileageUnitInput = 'km';
 
     const COMPACT_THRESHOLD = 760;
     const ICON_ONLY_THRESHOLD = 560;
@@ -29,6 +38,8 @@
     $: hasSelection = !!$SelectedVehicleStore;
 
     onMount(() => {
+        connectVehicleSocket();
+
         const resizeObserver = new ResizeObserver(([entry]) => {
             cardWidth = entry.contentRect.width;
         });
@@ -37,22 +48,50 @@
             resizeObserver.observe(cardRef);
         }
 
-        return () => resizeObserver.disconnect();
+        return () => {
+            resizeObserver.disconnect();
+            disconnectVehicleSocket();
+        };
     });
+
+    $: if ($selectedVehicle) {
+        mileageInput = Number($selectedVehicle.mileage ?? 0);
+        mileageUnitInput = $selectedVehicle.mileageUnit ?? 'km';
+    }
 
     function onVehicleChange(event) {
         selectVehicle(event.currentTarget.value || null);
     }
 
-    function onAddVehicle() {
-        // TODO: wire to create-vehicle flow
+    function openVehicleModal() {
         showVehicleModal = true;
+    }
+
+    function onAddVehicle() {
+        if (!regInput.trim() || !makeInput.trim() || !modelInput.trim()) return;
+
+        addVehicle({
+            reg: regInput.trim(),
+            make: makeInput.trim(),
+            model: modelInput.trim(),
+            mileage: Number(mileageInput) || 0,
+            mileageUnit: mileageUnitInput
+        });
+
+        regInput = '';
+        makeInput = '';
+        modelInput = '';
+        showVehicleModal = false;
     }
 
     async function onRemoveVehicle() {
         const id = get(SelectedVehicleStore);
         if (!id || $testState === 'running') return;
-        await removeVehicle(id);
+        removeVehicle(id);
+    }
+
+    function toggleMileageUnit() {
+        mileageUnitInput = mileageUnitInput === 'km' ? 'm' : 'km';
     }
 </script>
 
@@ -86,7 +125,19 @@
                         {/each}
                     </select>
 
-                    <Button size="icon" variant="secondary" aria-label="Add vehicle" on:click={onAddVehicle}>
+                    <div class="flex items-center gap-1">
+                        <input
+                            type="number"
+                            min="0"
+                            class="h-9 w-[86px] rounded-md border bg-background px-2 text-sm"
+                            bind:value={mileageInput}
+                        />
+                        <Button size="sm" variant="outline" on:click={toggleMileageUnit}>
+                            {mileageUnitInput === 'km' ? 'km' : 'm'}
+                        </Button>
+                    </div>
+
+                    <Button size="icon" variant="secondary" aria-label="Add vehicle" on:click={openVehicleModal}>
                         <Plus class="h-4 w-4" />
                     </Button>
 
@@ -210,6 +261,12 @@
                     >
                         <Trash2 class="mr-2 h-4 w-4" /> Remove
                     </Button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 pt-2">
+                    <input class="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Reg" bind:value={regInput} />
+                    <input class="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Make" bind:value={makeInput} />
+                    <input class="h-9 rounded-md border bg-background px-3 text-sm col-span-2" placeholder="Model" bind:value={modelInput} />
                 </div>
             </div>
         </div>
