@@ -3,6 +3,7 @@
     import IsOnline from './IsOnline/IsOnline.svelte';
     import Status from './Status/Status.svelte';
     import Nav from './Nav/Nav.svelte';
+    import { connectStatusSocket, disconnectStatusSocket } from '$lib/stores/system';
 
     let width = window.innerWidth;
 
@@ -12,10 +13,12 @@
 
     onMount(() => {
         window.addEventListener('resize', onResize);
+        connectStatusSocket();
     });
 
     onDestroy(() => {
         window.removeEventListener('resize', onResize);
+        disconnectStatusSocket();
     });
 
     $: mode =

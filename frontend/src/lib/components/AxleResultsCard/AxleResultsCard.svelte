@@ -11,14 +11,15 @@
         disconnectVehicleSocket,
         addVehicle,
         selectVehicle,
-        removeVehicle
+        removeVehicle,
+        updateVehicleMileage
     } from '$lib/stores/vehicles';
 
     import { Card, CardHeader, CardTitle, CardContent, CardAction } from '$lib/components/ui/card';
     import { Badge } from '$lib/components/ui/badge';
     import { Button } from '$lib/components/ui/button';
 
-    import { Plus, Printer, Trash2, X } from 'lucide-svelte';
+    import { Plus, Trash2, X } from 'lucide-svelte';
 
     let cardRef;
     let cardWidth = 0;
@@ -55,8 +56,13 @@
     });
 
     $: if ($selectedVehicle) {
-        mileageInput = Number($selectedVehicle.mileage ?? 0);
-        mileageUnitInput = $selectedVehicle.mileageUnit ?? 'km';
+        const mileageValue = ($selectedVehicle.mileage ?? '').toString().trim();
+        const mileageMatch = mileageValue.match(/^(\d+(?:\.\d+)?)\s*(km|m)$/i);
+
+        if (mileageMatch) {
+            mileageInput = Number(mileageMatch[1]);
+            mileageUnitInput = mileageMatch[2].toLowerCase();
+        }
     }
 
     function onVehicleChange(event) {
@@ -64,7 +70,14 @@
     }
 
     function openVehicleModal() {
+        regInput = '';
+        makeInput = '';
+        modelInput = '';
         showVehicleModal = true;
+    }
+
+    function closeVehicleModal() {
+        showVehicleModal = false;
     }
 
     function onAddVehicle() {
@@ -73,15 +86,10 @@
         addVehicle({
             reg: regInput.trim(),
             make: makeInput.trim(),
-            model: modelInput.trim(),
-            mileage: Number(mileageInput) || 0,
-            mileageUnit: mileageUnitInput
+            model: modelInput.trim()
         });
 
-        regInput = '';
-        makeInput = '';
-        modelInput = '';
-        showVehicleModal = false;
+        closeVehicleModal();
     }
 
     async function onRemoveVehicle() {
@@ -90,9 +98,22 @@
         removeVehicle(id);
     }
 
-    function toggleMileageUnit() {
-        mileageUnitInput = mileageUnitInput === 'km' ? 'm' : 'km';
+    function buildMileagePayload() {
+        const numericMileage = Number(mileageInput);
+        if (!Number.isFinite(numericMileage) || numericMileage <= 0) {
+            return null;
+        }
+
+        return `${numericMileage}${mileageUnitInput}`;
     }
+
+    function saveMileageUpdate() {
+        const id = get(SelectedVehicleStore);
+        if (!id) return;
+
+        updateVehicleMileage(id, buildMileagePayload());
+    }
+
 </script>
 
 <Card class="w-full" bind:ref={cardRef}>
@@ -101,15 +122,11 @@
 
         <CardAction class="row-span-1 row-start-1 self-center">
             {#if iconOnlyControls}
-                <Button size="icon" variant="secondary" aria-label="Vehicle controls" on:click={() => (showVehicleModal = true)}>
-                    <Printer class="h-4 w-4" />
+                <Button size="icon" variant="secondary" aria-label="Add vehicle" onclick={openVehicleModal}>
+                    <Plus class="h-4 w-4" />
                 </Button>
             {:else}
                 <div class="flex items-center gap-2 min-w-0">
-                    <Button size="icon" variant="secondary" aria-label="Print options" on:click={() => (showVehicleModal = true)}>
-                        <Printer class="h-4 w-4" />
-                    </Button>
-
                     <span class="text-xs text-muted-foreground whitespace-nowrap {compactControls ? 'hidden' : ''}">
                         Next test:
                     </span>
@@ -117,7 +134,7 @@
                     <select
                         class="h-9 min-w-0 w-[220px] max-w-[42vw] rounded-md border bg-background px-3 text-sm transition-colors focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] {hasSelection ? 'border-emerald-400/70 ring-1 ring-emerald-300/40' : 'border-input'}"
                         bind:value={$SelectedVehicleStore}
-                        on:change={onVehicleChange}
+                        onchange={onVehicleChange}
                     >
                         <option value="">No vehicle</option>
                         {#each $VehicleListStore as vehicle}
@@ -125,19 +142,34 @@
                         {/each}
                     </select>
 
-                    <div class="flex items-center gap-1">
+                    <div class="flex items-center gap-2">
                         <input
                             type="number"
                             min="0"
                             class="h-9 w-[86px] rounded-md border bg-background px-2 text-sm"
                             bind:value={mileageInput}
+                            onblur={saveMileageUpdate}
+                            onchange={saveMileageUpdate}
                         />
-                        <Button size="sm" variant="outline" on:click={toggleMileageUnit}>
-                            {mileageUnitInput === 'km' ? 'km' : 'm'}
-                        </Button>
+                        <div class="inline-flex items-center rounded-full border bg-muted p-0.5">
+                            <button
+                                type="button"
+                                class="h-7 min-w-[2.25rem] rounded-full px-2 text-xs font-medium transition-colors {mileageUnitInput === 'km' ? 'bg-background shadow-sm' : 'text-muted-foreground'}"
+                                onclick={() => { mileageUnitInput = 'km'; saveMileageUpdate(); }}
+                            >
+                                km
+                            </button>
+                            <button
+                                type="button"
+                                class="h-7 min-w-[2.25rem] rounded-full px-2 text-xs font-medium transition-colors {mileageUnitInput === 'm' ? 'bg-background shadow-sm' : 'text-muted-foreground'}"
+                                onclick={() => { mileageUnitInput = 'm'; saveMileageUpdate(); }}
+                            >
+                                m
+                            </button>
+                        </div>
                     </div>
 
-                    <Button size="icon" variant="secondary" aria-label="Add vehicle" on:click={openVehicleModal}>
+                    <Button size="icon" variant="secondary" aria-label="Add vehicle" onclick={openVehicleModal}>
                         <Plus class="h-4 w-4" />
                     </Button>
 
@@ -146,7 +178,7 @@
                         variant="destructive"
                         aria-label="Remove vehicle"
                         disabled={!$SelectedVehicleStore || $testState === 'running'}
-                        on:click={onRemoveVehicle}
+                        onclick={onRemoveVehicle}
                     >
                         <Trash2 class="h-4 w-4" />
                     </Button>
@@ -228,45 +260,23 @@
 
 {#if showVehicleModal}
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
-        <div class="w-full max-w-md rounded-lg border bg-background p-4 shadow-lg">
+        <div class="w-full max-w-md rounded-lg border bg-background p-4 text-foreground shadow-lg">
             <div class="mb-4 flex items-center justify-between">
-                <h3 class="text-sm font-semibold">Vehicle controls</h3>
-                <Button size="icon" variant="ghost" aria-label="Close vehicle controls" on:click={() => (showVehicleModal = false)}>
+                <h3 class="text-sm font-semibold">Add vehicle</h3>
+                <Button size="icon" variant="ghost" aria-label="Close add vehicle dialog" onclick={closeVehicleModal}>
                     <X class="h-4 w-4" />
                 </Button>
             </div>
 
             <div class="space-y-3">
-                <label class="text-xs text-muted-foreground" for="vehicle-picker-modal">Next test</label>
-                <select
-                    id="vehicle-picker-modal"
-                    class="h-9 w-full rounded-md border bg-background px-3 text-sm transition-colors focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] {hasSelection ? 'border-emerald-400/70 ring-1 ring-emerald-300/40' : 'border-input'}"
-                    bind:value={$SelectedVehicleStore}
-                    on:change={onVehicleChange}
-                >
-                    <option value="">No vehicle</option>
-                    {#each $VehicleListStore as vehicle}
-                        <option value={vehicle.id}>{vehicle.reg} — {vehicle.make}</option>
-                    {/each}
-                </select>
-
-                <div class="flex justify-end gap-2 pt-1">
-                    <Button variant="secondary" on:click={onAddVehicle}>
-                        <Plus class="mr-2 h-4 w-4" /> Add
-                    </Button>
-                    <Button
-                        variant="destructive"
-                        disabled={!$SelectedVehicleStore || $testState === 'running'}
-                        on:click={onRemoveVehicle}
-                    >
-                        <Trash2 class="mr-2 h-4 w-4" /> Remove
-                    </Button>
+                <div class="grid grid-cols-2 gap-2">
+                    <input class="h-9 rounded-md border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground" placeholder="Reg" bind:value={regInput} />
+                    <input class="h-9 rounded-md border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground" placeholder="Make" bind:value={makeInput} />
+                    <input class="h-9 rounded-md border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground col-span-2" placeholder="Model" bind:value={modelInput} />
                 </div>
-
-                <div class="grid grid-cols-2 gap-2 pt-2">
-                    <input class="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Reg" bind:value={regInput} />
-                    <input class="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Make" bind:value={makeInput} />
-                    <input class="h-9 rounded-md border bg-background px-3 text-sm col-span-2" placeholder="Model" bind:value={modelInput} />
+                <div class="flex justify-end gap-2 pt-3">
+                    <Button variant="outline" onclick={closeVehicleModal}>Cancel</Button>
+                    <Button variant="secondary" onclick={onAddVehicle}>Save</Button>
                 </div>
             </div>
         </div>

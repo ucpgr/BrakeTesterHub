@@ -58,9 +58,26 @@ export function removeVehicle(id) {
     sendSocketMessage({ action: 'delete', id: Number(id) });
 }
 
+export function updateVehicleMileage(id, mileage) {
+    const parsedId = Number(id);
+    if (!parsedId || Number.isNaN(parsedId)) return;
+
+    sendSocketMessage({
+        action: 'update_mileage',
+        id: parsedId,
+        mileage: mileage && mileage.trim().length > 0 ? mileage.trim() : null
+    });
+}
+
 export function selectVehicle(id) {
     const parsedId = id ? Number(id) : null;
     SelectedVehicleStore.set(parsedId);
+
+    if (parsedId === null || Number.isNaN(parsedId)) {
+        sendSocketMessage({ action: 'select' });
+        return;
+    }
+
     sendSocketMessage({ action: 'select', id: parsedId });
 }
 

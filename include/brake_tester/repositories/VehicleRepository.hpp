@@ -17,6 +17,7 @@ public:
   VehicleSelection addVehicle(const VehicleSelection& vehicle) override;
   bool deleteVehicle(int id) override;
   bool tryGetVehicle(int id, VehicleSelection& vehicle) const override;
+  bool updateVehicleMileage(int id, const std::optional<std::string>& mileage) override;
 
 private:
   void initializeSchema() const;

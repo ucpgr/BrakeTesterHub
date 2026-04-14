@@ -46,6 +46,7 @@ void BrakeTesterHttpServer::start() {
   }
   configureLptModule();
   configureVehicleModule();
+  configureStatusModule();
   startLptBroadcastLoop();
 
   m_ServerThread = std::thread([this] {
@@ -136,6 +137,24 @@ void BrakeTesterHttpServer::startLptBroadcastLoop() {
           socket->send(payloadText);
         }
       }
+
+      switch (status) {
+        case LptProcessStatus::TransferStarted:
+          broadcastStatus("progress", "Capture transfer started");
+          break;
+        case LptProcessStatus::DataPatched:
+          broadcastStatus("progress", "Captured data patched");
+          break;
+        case LptProcessStatus::ConversionStarted:
+          broadcastStatus("progress", "Document conversion started");
+          break;
+        case LptProcessStatus::ConversionFinished:
+          broadcastStatus("info", "Document conversion finished");
+          break;
+        default:
+          broadcastStatus("idle", "Idle");
+          break;
+      }
     }
   });
 }
@@ -165,25 +184,88 @@ void BrakeTesterHttpServer::configureVehicleModule() {
           vehicle.reg = vehiclePayload.value("reg", "");
           vehicle.make = vehiclePayload.value("make", "");
           vehicle.model = vehiclePayload.value("model", "");
-          vehicle.mileage = vehiclePayload.value("mileage", 0);
-          vehicle.mileageUnit = vehiclePayload.value("mileageUnit", "km");
+
+          if (vehiclePayload.contains("mileage") && vehiclePayload["mileage"].is_string()) {
+            const std::string mileageValue = vehiclePayload.value("mileage", "");
+            if (!mileageValue.empty()) {
+              vehicle.mileage = mileageValue;
+            }
+          } else if (vehiclePayload.contains("mileage") && vehiclePayload["mileage"].is_number()) {
+            const std::string mileageUnit = vehiclePayload.value("mileageUnit", "km");
+            std::string mileageValue;
+
+            if (vehiclePayload["mileage"].is_number_integer()) {
+              mileageValue = std::to_string(vehiclePayload.value("mileage", 0));
+            } else {
+              mileageValue = std::to_string(vehiclePayload.value("mileage", 0.0));
+              mileageValue.erase(mileageValue.find_last_not_of('0') + 1);
+              if (!mileageValue.empty() && mileageValue.back() == '.') {
+                mileageValue.pop_back();
+              }
+            }
+
+            if (!mileageValue.empty()) {
+              vehicle.mileage = mileageValue + mileageUnit;
+            }
+          }
 
           if (!vehicle.reg.empty() && !vehicle.make.empty() && !vehicle.model.empty()) {
             VehicleSelection created = m_VehicleRepository.addVehicle(vehicle);
             m_SelectedVehicleStore.setSelectedVehicle(created);
+            if (m_Log) {
+              m_Log->information("[BrakeTesterHttpServer Info]: Vehicle saved: id=" + std::to_string(created.id) +
+                                 ", reg=" + created.reg + ", make=" + created.make + ", model=" + created.model);
+            }
             broadcastVehicleState();
+            broadcastStatus("info", "Vehicle saved: " + created.reg);
           }
         } else if (action == "select") {
           const int id = payload.value("id", 0);
           if (id <= 0) {
             m_SelectedVehicleStore.setSelectedVehicle({});
+            if (m_Log) {
+              m_Log->information("[BrakeTesterHttpServer Info]: Vehicle selection cleared.");
+            }
+            broadcastStatus("info", "No vehicle selected");
           } else {
             VehicleSelection selected;
             if (m_VehicleRepository.tryGetVehicle(id, selected)) {
               m_SelectedVehicleStore.setSelectedVehicle(selected);
+              if (m_Log) {
+                m_Log->information("[BrakeTesterHttpServer Info]: Vehicle selected: id=" + std::to_string(selected.id) +
+                                   ", reg=" + selected.reg + ", make=" + selected.make + ", model=" + selected.model);
+              }
+              broadcastStatus("info", "Vehicle selected: " + selected.reg);
             }
           }
           broadcastVehicleState();
+        } else if (action == "update_mileage") {
+          const int id = payload.value("id", 0);
+          std::optional<std::string> mileage;
+
+          if (payload.contains("mileage") && payload["mileage"].is_string()) {
+            const std::string mileageValue = payload.value("mileage", "");
+            if (!mileageValue.empty()) {
+              mileage = mileageValue;
+            }
+          }
+
+          if (id > 0 && m_VehicleRepository.updateVehicleMileage(id, mileage)) {
+            VehicleSelection selected;
+            if (m_VehicleRepository.tryGetVehicle(id, selected)) {
+              const VehicleSelection currentSelection = m_SelectedVehicleStore.getSelectedVehicle();
+              if (currentSelection.id == id) {
+                m_SelectedVehicleStore.setSelectedVehicle(selected);
+              }
+
+              if (m_Log) {
+                m_Log->information("[BrakeTesterHttpServer Info]: Vehicle mileage updated: id=" + std::to_string(id) +
+                                   ", mileage=" + (selected.mileage.has_value() ? *selected.mileage : "<none>"));
+              }
+              broadcastStatus("info", "Vehicle mileage updated");
+            }
+            broadcastVehicleState();
+          }
         } else if (action == "delete") {
           const int id = payload.value("id", 0);
           if (id > 0 && m_VehicleRepository.deleteVehicle(id)) {
@@ -191,7 +273,11 @@ void BrakeTesterHttpServer::configureVehicleModule() {
             if (selected.id == id) {
               m_SelectedVehicleStore.setSelectedVehicle({});
             }
+            if (m_Log) {
+              m_Log->information("[BrakeTesterHttpServer Info]: Vehicle deleted: id=" + std::to_string(id));
+            }
             broadcastVehicleState();
+            broadcastStatus("warning", "Vehicle deleted");
           }
         }
       } catch (const std::exception& ex) {
@@ -208,20 +294,66 @@ void BrakeTesterHttpServer::configureVehicleModule() {
   });
 }
 
+
+void BrakeTesterHttpServer::configureStatusModule() {
+  if (m_Log) {
+    m_Log->information("[BrakeTesterHttpServer Info]: Configuring status websocket module at /status.");
+  }
+
+  m_Server->WebSocket("/status", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
+    {
+      std::scoped_lock lock(m_StatusClientMutex);
+      m_StatusClients.insert(&socket);
+    }
+
+    socket.send(nlohmann::json{{"event", "status.update"}, {"status", {{"level", "idle"}, {"text", "Idle"}}}}.dump());
+
+    std::string message;
+    while (m_IsRunning.load() && socket.read(message) != httplib::ws::Fail) {
+    }
+
+    {
+      std::scoped_lock lock(m_StatusClientMutex);
+      m_StatusClients.erase(&socket);
+    }
+  });
+}
+
+void BrakeTesterHttpServer::broadcastStatus(const std::string& level, const std::string& text) {
+  const nlohmann::json payload = {
+      {"event", "status.update"},
+      {"status", {{"level", level}, {"text", text}}},
+  };
+
+  const std::string payloadText = payload.dump();
+  std::scoped_lock lock(m_StatusClientMutex);
+  for (auto* socket : m_StatusClients) {
+    if (socket != nullptr) {
+      socket->send(payloadText);
+    }
+  }
+}
+
 nlohmann::json BrakeTesterHttpServer::buildVehicleStatePayload() const {
   const auto vehicles = m_VehicleRepository.getVehicles();
   const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
 
   nlohmann::json vehicleItems = nlohmann::json::array();
   for (const auto& vehicle : vehicles) {
-    vehicleItems.push_back({
+    nlohmann::json vehicleItem = {
         {"id", vehicle.id},
         {"reg", vehicle.reg},
         {"make", vehicle.make},
         {"model", vehicle.model},
-        {"mileage", vehicle.mileage},
-        {"mileageUnit", vehicle.mileageUnit},
-    });
+    };
+
+    if (vehicle.mileage.has_value()) {
+      vehicleItem["mileage"] = *vehicle.mileage;
+    } else {
+      vehicleItem["mileage"] = nullptr;
+    }
+
+    vehicleItems.push_back(vehicleItem);
   }
 
   const nlohmann::json selectedVehicleId = selectedVehicle.id > 0 ? nlohmann::json(selectedVehicle.id)
