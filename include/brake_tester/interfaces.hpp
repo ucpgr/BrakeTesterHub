@@ -51,6 +51,8 @@ public:
 
   virtual LptProcessStatus getProcessStatus() const = 0;
   virtual void setProcessStatus(LptProcessStatus status) = 0;
+  virtual bool isLptTestEnabled() const = 0;
+  virtual void setLptTestEnabled(bool enabled) = 0;
   virtual std::uint64_t getProcessStatusVersion() const = 0;
   virtual bool waitForProcessStatusAfter(std::uint64_t afterVersion,
                                          std::chrono::milliseconds timeout,

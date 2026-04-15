@@ -18,6 +18,8 @@ public:
 
   LptProcessStatus getProcessStatus() const override;
   void setProcessStatus(LptProcessStatus status) override;
+  bool isLptTestEnabled() const override;
+  void setLptTestEnabled(bool enabled) override;
   std::uint64_t getProcessStatusVersion() const override;
   bool waitForProcessStatusAfter(std::uint64_t afterVersion,
                                  std::chrono::milliseconds timeout,
@@ -32,6 +34,7 @@ private:
   std::string m_CurrentCaptureFilename;
 
   LptProcessStatus m_ProcessStatus{LptProcessStatus::Idle};
+  bool m_LptTestEnabled{false};
   std::uint64_t m_ProcessStatusVersion{0};
 };
 

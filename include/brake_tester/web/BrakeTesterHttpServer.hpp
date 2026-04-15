@@ -27,7 +27,7 @@ public:
                         ISelectedVehicleStore& selectedVehicleStore,
                         SharedLogger log,
                         std::string host = "0.0.0.0",
-                        int port = 8080,
+                        int port = 80,
                         std::string staticRoot = "www");
   ~BrakeTesterHttpServer();
 
