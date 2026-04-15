@@ -20,11 +20,16 @@ class WebSocket;
 
 namespace brake_tester {
 
+class LptManager;
+
 class BrakeTesterHttpServer {
 public:
   BrakeTesterHttpServer(ILptStore& lptStore,
+                        ISettingsRepository& settingsRepository,
+                        ISerialDeviceStore& serialDeviceStore,
                         IVehicleRepository& vehicleRepository,
                         ISelectedVehicleStore& selectedVehicleStore,
+                        LptManager& lptManager,
                         SharedLogger log,
                         std::string host = "0.0.0.0",
                         int port = 80,
@@ -38,15 +43,22 @@ private:
   void configureLptModule();
   void configureVehicleModule();
   void configureStatusModule();
+  void configureSettingsModule();
   void startLptBroadcastLoop();
+  void startSettingsBroadcastLoop();
   void broadcastVehicleState();
+  void broadcastSettingsState();
   nlohmann::json buildVehicleStatePayload() const;
+  nlohmann::json buildSettingsStatePayload() const;
   std::string lptEventNameForStatus(LptProcessStatus status) const;
   void broadcastStatus(const std::string& level, const std::string& text);
 
   ILptStore& m_LptStore;
+  ISettingsRepository& m_SettingsRepository;
+  ISerialDeviceStore& m_SerialDeviceStore;
   IVehicleRepository& m_VehicleRepository;
   ISelectedVehicleStore& m_SelectedVehicleStore;
+  LptManager& m_LptManager;
   SharedLogger m_Log;
   std::string m_Host;
   int m_Port;
@@ -57,6 +69,7 @@ private:
   std::thread m_ServerThread;
 
   std::thread m_LptBroadcastThread;
+  std::thread m_SettingsBroadcastThread;
   std::mutex m_LptClientMutex;
   std::unordered_set<httplib::ws::WebSocket*> m_LptClients;
 
@@ -65,6 +78,9 @@ private:
 
   std::mutex m_StatusClientMutex;
   std::unordered_set<httplib::ws::WebSocket*> m_StatusClients;
+
+  std::mutex m_SettingsClientMutex;
+  std::unordered_set<httplib::ws::WebSocket*> m_SettingsClients;
 };
 
 } // namespace brake_tester
