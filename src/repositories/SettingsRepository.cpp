@@ -45,7 +45,11 @@ void SettingsRepository::initializeSchema() {
 }
 
 void SettingsRepository::loadCachedSerialSettings() {
-  m_CachedSerialSettings.devicePath = getSettingValueOrDefault("devicePath", m_CachedSerialSettings.devicePath);
+  m_CachedSerialSettings.lptDevicePath = getSettingValueOrDefault(
+      "lptDevicePath",
+      getSettingValueOrDefault("devicePath", m_CachedSerialSettings.lptDevicePath));
+  m_CachedSerialSettings.brakeTesterDevicePath =
+      getSettingValueOrDefault("brakeTesterDevicePath", m_CachedSerialSettings.brakeTesterDevicePath);
 
   const std::string baudRateText = getSettingValueOrDefault("baudRate", std::to_string(m_CachedSerialSettings.baudRate));
   m_CachedSerialSettings.baudRate = static_cast<std::uint32_t>(std::strtoul(baudRateText.c_str(), nullptr, 10));
@@ -94,7 +98,9 @@ void SettingsRepository::upsertCachedSerialSettings() const {
     throw std::runtime_error("Failed to prepare LptSettings upsert statement");
   }
 
-  persistSetting(statement, "devicePath", m_CachedSerialSettings.devicePath);
+  persistSetting(statement, "devicePath", m_CachedSerialSettings.lptDevicePath);
+  persistSetting(statement, "lptDevicePath", m_CachedSerialSettings.lptDevicePath);
+  persistSetting(statement, "brakeTesterDevicePath", m_CachedSerialSettings.brakeTesterDevicePath);
   persistSetting(statement, "baudRate", std::to_string(m_CachedSerialSettings.baudRate));
   persistSetting(statement, "silenceTimeoutMs", std::to_string(m_CachedSerialSettings.silenceTimeout.count()));
   persistSetting(statement, "readChunkSize", std::to_string(m_CachedSerialSettings.readChunkSize));
