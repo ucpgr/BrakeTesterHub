@@ -3,6 +3,7 @@
 #include <atomic>
 #include <memory>
 #include <string>
+#include <thread>
 
 #include <sqlite3.h>
 
@@ -30,6 +31,7 @@ private:
   void startInputListener();
 
   std::atomic_bool m_IsInputListening{false};
+  std::thread m_InputThread;
   SharedLogger m_Log;
   sqlite3* m_DatabaseHandle{nullptr};
 

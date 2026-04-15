@@ -6,8 +6,8 @@
 </script>
 
 <TopBar></TopBar>
-<div class="min-h-screen bg-background p-8">
-  <div class="mx-auto w-full max-w-7xl px-6 py-6 space-y-6">
+<div class="min-h-screen bg-background px-2 py-3 sm:px-4 sm:py-5 md:px-6 md:py-6 lg:px-8 lg:py-8">
+  <div class="mx-auto w-full max-w-7xl px-1 py-2 sm:px-2 sm:py-3 md:px-4 md:py-4 lg:px-6 lg:py-6 space-y-6">
   {#if $currentRoute === '/live'}
     <h1>Live</h1>
   {:else if $currentRoute === '/settings'}
@@ -23,4 +23,3 @@
   {/if}
   </div>
 </div>
-
