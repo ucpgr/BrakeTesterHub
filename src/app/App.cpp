@@ -10,8 +10,10 @@
 #include <thread>
 
 #if defined(_WIN32)
+#include <conio.h>
 #include <io.h>
 #else
+#include <sys/select.h>
 #include <unistd.h>
 #endif
 
@@ -34,6 +36,21 @@ std::string formatCurrentUtc(const char* formatPattern) {
   std::ostringstream textStream;
   textStream << std::put_time(&utcTime, formatPattern);
   return textStream.str();
+}
+
+bool hasConsoleInputAvailable() {
+#if defined(_WIN32)
+  return _kbhit() != 0;
+#else
+  fd_set readSet;
+  FD_ZERO(&readSet);
+  FD_SET(STDIN_FILENO, &readSet);
+  timeval timeout{};
+  timeout.tv_sec = 0;
+  timeout.tv_usec = 0;
+  const int selectResult = select(STDIN_FILENO + 1, &readSet, nullptr, nullptr, &timeout);
+  return selectResult > 0 && FD_ISSET(STDIN_FILENO, &readSet);
+#endif
 }
 } // namespace
 
@@ -172,7 +189,7 @@ void App::startInputListener() {
     }
     std::string consoleInput;
     while (m_IsInputListening) {
-      if (std::cin.rdbuf()->in_avail() <= 0) {
+      if (!hasConsoleInputAvailable()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         continue;
       }
