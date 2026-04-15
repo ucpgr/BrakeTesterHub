@@ -36,6 +36,16 @@ void LptStore::setProcessStatus(LptProcessStatus status) {
   m_ProcessStatusCondition.notify_all();
 }
 
+bool LptStore::isLptTestEnabled() const {
+  std::scoped_lock lock(m_Mutex);
+  return m_LptTestEnabled;
+}
+
+void LptStore::setLptTestEnabled(bool enabled) {
+  std::scoped_lock lock(m_Mutex);
+  m_LptTestEnabled = enabled;
+}
+
 std::uint64_t LptStore::getProcessStatusVersion() const {
   std::scoped_lock lock(m_Mutex);
   return m_ProcessStatusVersion;

@@ -71,6 +71,7 @@ void LptManager::start() {
         }
 
         auto patchedBytes = m_Patcher->patch(incomingBytes);
+        m_LptStore.setLptTestEnabled(false);
         m_LptStore.setProcessStatus(LptProcessStatus::DataPatched);
         if (m_Log) {
           m_Log->information("[LptManager Info]: Data patched. Output bytes: " + std::to_string(patchedBytes.size()));

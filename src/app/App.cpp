@@ -2,7 +2,10 @@
 
 #include <chrono>
 #include <cstdio>
+#include <ctime>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <thread>
 
@@ -18,6 +21,21 @@
 #include "brake_tester/web/BrakeTesterHttpServer.hpp"
 
 namespace brake_tester {
+namespace {
+std::string formatCurrentUtc(const char* formatPattern) {
+  const auto now = std::chrono::system_clock::now();
+  const std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
+  std::tm utcTime{};
+#ifdef _WIN32
+  gmtime_s(&utcTime, &nowTime);
+#else
+  gmtime_r(&nowTime, &utcTime);
+#endif
+  std::ostringstream textStream;
+  textStream << std::put_time(&utcTime, formatPattern);
+  return textStream.str();
+}
+} // namespace
 
 App::App(std::string databasePath) {
   m_Log = std::make_shared<Logger>(LogVerbosity::Information);
@@ -36,6 +54,36 @@ App::App(std::string databasePath) {
 
   auto listener = std::make_unique<LptListener>(*m_SettingsRepository, *m_LptStore, m_Log);
   auto patcher = std::make_unique<PrnPatcher>(*m_SelectedVehicleStore, m_Log);
+  patcher->addPatch(0x2671, [this](const VehicleSelection&) { // userLine1 length 34
+    return m_LptStore->isLptTestEnabled() ? std::string("TEST") : std::string();
+  });
+  patcher->addPatch(0x26c5, [this](const VehicleSelection&) { // userLine2 length 34
+    return m_LptStore->isLptTestEnabled() ? std::string("TEST") : std::string();
+  });
+  patcher->addPatch(0x2715, [this](const VehicleSelection&) { // userLine3 length 34
+    return m_LptStore->isLptTestEnabled() ? std::string("TEST") : std::string();
+  });
+
+  patcher->addPatch(0x2744, [this](const VehicleSelection&) { // licence length 27
+    return m_LptStore->isLptTestEnabled() ? std::string("TEST") : std::string();
+  });
+  patcher->addPatch(0x2794, [this](const VehicleSelection&) { // make length 27
+    return m_LptStore->isLptTestEnabled() ? std::string("TEST") : std::string();
+  });
+  patcher->addPatch(0x27e4, [this](const VehicleSelection&) { // model length 27
+    return m_LptStore->isLptTestEnabled() ? std::string("TEST") : std::string();
+  });
+  patcher->addPatch(0x2834, [this](const VehicleSelection&) { // mileage length 27
+    return m_LptStore->isLptTestEnabled() ? std::string("TEST") : std::string();
+  });
+
+  patcher->addPatch(0x27c1, [](const VehicleSelection&) { // testDate length 8
+    return formatCurrentUtc("%d/%m/%y");
+  });
+  patcher->addPatch(0x2811, [](const VehicleSelection&) { // testTime length 8
+    return formatCurrentUtc("%H:%M:%S");
+  });
+
   auto renderer = std::make_unique<PrnRenderer>(m_Log);
   auto prnWriter = std::make_unique<PrnWriter>(".", m_Log);
 
@@ -53,7 +101,7 @@ App::App(std::string databasePath) {
       *m_SelectedVehicleStore,
       m_Log,
       "0.0.0.0",
-      8080,
+      80,
       "www");
   m_Log->information("[App Info]: Runtime modules constructed successfully.");
 }
@@ -135,6 +183,7 @@ void App::startInputListener() {
       }
 
       if (consoleInput == "t") {
+        m_LptStore->setLptTestEnabled(true);
         m_LptManager->sendTestSignal();
       }
     }
