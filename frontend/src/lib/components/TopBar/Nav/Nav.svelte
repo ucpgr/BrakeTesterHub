@@ -46,11 +46,13 @@
         >
             <Menu class="w-5 h-5 text-foreground" />
         </summary>
-        <nav class="absolute right-0 z-50 mt-2 min-w-[180px] rounded-md border bg-background p-1 shadow-md">
+        <nav class="absolute right-0 z-50 mt-2 min-w-[180px] rounded-md border bg-background p-1 text-foreground shadow-md">
             {#each routes.filter(r => r.nav) as route}
                 <button
-                    class={`flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm ${
-                        isActive(route.path, $currentRoute) ? 'bg-muted text-foreground' : 'hover:bg-muted'
+                    class={`flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm text-foreground ${
+                        isActive(route.path, $currentRoute)
+                            ? 'bg-muted text-foreground'
+                            : 'hover:bg-muted hover:text-foreground'
                     }`}
                     disabled={isActive(route.path, $currentRoute)}
                     on:click={() => navigate(route.path)}

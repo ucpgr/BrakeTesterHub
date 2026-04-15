@@ -1,9 +1,16 @@
 #include "brake_tester/app.hpp"
 
 #include <chrono>
+#include <cstdio>
 #include <iostream>
 #include <stdexcept>
 #include <thread>
+
+#if defined(_WIN32)
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 
 #include "brake_tester/components.hpp"
 #include "brake_tester/lpt_manager.hpp"
@@ -70,6 +77,10 @@ void App::shutdown() {
     m_Log->information("[App Info]: Shutting down runtime modules.");
   }
 
+  if (m_InputThread.joinable()) {
+    m_InputThread.join();
+  }
+
   if (m_HttpServer) {
     m_HttpServer->stop();
   }
@@ -92,15 +103,34 @@ void App::startInputListener() {
     return;
   }
 
-  std::thread([this]() {
+  const bool isInteractiveConsole =
+#if defined(_WIN32)
+      _isatty(_fileno(stdin)) != 0;
+#else
+      isatty(fileno(stdin)) != 0;
+#endif
+
+  if (!isInteractiveConsole) {
+    m_IsInputListening = false;
+    if (m_Log) {
+      m_Log->information("[App Info]: Input listener disabled (stdin is not an interactive terminal).");
+    }
+    return;
+  }
+
+  m_InputThread = std::thread([this]() {
     if (m_Log) {
       m_Log->information("[App Info]: Input listener active. Type 't' and press Enter for test signal.");
     }
     std::string consoleInput;
     while (m_IsInputListening) {
+      if (std::cin.rdbuf()->in_avail() <= 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        continue;
+      }
+
       if (!std::getline(std::cin, consoleInput)) {
         std::cin.clear();
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         continue;
       }
 
@@ -108,7 +138,7 @@ void App::startInputListener() {
         m_LptManager->sendTestSignal();
       }
     }
-  }).detach();
+  });
 }
 
 } // namespace brake_tester

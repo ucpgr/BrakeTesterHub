@@ -19,11 +19,12 @@
     import { Badge } from '$lib/components/ui/badge';
     import { Button } from '$lib/components/ui/button';
 
-    import { Plus, Trash2, X } from 'lucide-svelte';
+    import { Plus, Printer, Trash2, X } from 'lucide-svelte';
 
     let cardRef;
     let cardWidth = 0;
     let showVehicleModal = false;
+    let showVehicleControlsModal = false;
     let regInput = '';
     let makeInput = '';
     let modelInput = '';
@@ -73,11 +74,20 @@
         regInput = '';
         makeInput = '';
         modelInput = '';
+        showVehicleControlsModal = false;
         showVehicleModal = true;
     }
 
     function closeVehicleModal() {
         showVehicleModal = false;
+    }
+
+    function openVehicleControlsModal() {
+        showVehicleControlsModal = true;
+    }
+
+    function closeVehicleControlsModal() {
+        showVehicleControlsModal = false;
     }
 
     function onAddVehicle() {
@@ -122,8 +132,8 @@
 
         <CardAction class="row-span-1 row-start-1 self-center">
             {#if iconOnlyControls}
-                <Button size="icon" variant="secondary" aria-label="Add vehicle" onclick={openVehicleModal}>
-                    <Plus class="h-4 w-4" />
+                <Button size="icon" variant="secondary" aria-label="Vehicle controls" onclick={openVehicleControlsModal}>
+                    <Printer class="h-4 w-4" />
                 </Button>
             {:else}
                 <div class="flex items-center gap-2 min-w-0">
@@ -277,6 +287,74 @@
                 <div class="flex justify-end gap-2 pt-3">
                     <Button variant="outline" onclick={closeVehicleModal}>Cancel</Button>
                     <Button variant="secondary" onclick={onAddVehicle}>Save</Button>
+                </div>
+            </div>
+        </div>
+    </div>
+{/if}
+
+{#if showVehicleControlsModal}
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
+        <div class="w-full max-w-md rounded-lg border bg-background p-4 text-foreground shadow-lg">
+            <div class="mb-4 flex items-center justify-between">
+                <h3 class="text-sm font-semibold">Vehicle selection</h3>
+                <Button size="icon" variant="ghost" aria-label="Close vehicle controls dialog" onclick={closeVehicleControlsModal}>
+                    <X class="h-4 w-4" />
+                </Button>
+            </div>
+
+            <div class="space-y-3">
+                <select
+                    class="h-9 w-full rounded-md border bg-background px-3 text-sm transition-colors focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] {hasSelection ? 'border-emerald-400/70 ring-1 ring-emerald-300/40' : 'border-input'}"
+                    bind:value={$SelectedVehicleStore}
+                    onchange={onVehicleChange}
+                >
+                    <option value="">No vehicle</option>
+                    {#each $VehicleListStore as vehicle}
+                        <option value={vehicle.id}>{vehicle.reg} — {vehicle.make}</option>
+                    {/each}
+                </select>
+
+                <div class="flex items-center gap-2">
+                    <input
+                        type="number"
+                        min="0"
+                        class="h-9 w-[110px] rounded-md border bg-background px-2 text-sm"
+                        bind:value={mileageInput}
+                        onblur={saveMileageUpdate}
+                        onchange={saveMileageUpdate}
+                    />
+                    <div class="inline-flex items-center rounded-full border bg-muted p-0.5">
+                        <button
+                            type="button"
+                            class="h-7 min-w-[2.25rem] rounded-full px-2 text-xs font-medium transition-colors {mileageUnitInput === 'km' ? 'bg-background shadow-sm' : 'text-muted-foreground'}"
+                            onclick={() => { mileageUnitInput = 'km'; saveMileageUpdate(); }}
+                        >
+                            km
+                        </button>
+                        <button
+                            type="button"
+                            class="h-7 min-w-[2.25rem] rounded-full px-2 text-xs font-medium transition-colors {mileageUnitInput === 'm' ? 'bg-background shadow-sm' : 'text-muted-foreground'}"
+                            onclick={() => { mileageUnitInput = 'm'; saveMileageUpdate(); }}
+                        >
+                            m
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <Button size="icon" variant="secondary" aria-label="Add vehicle" onclick={openVehicleModal}>
+                        <Plus class="h-4 w-4" />
+                    </Button>
+                    <Button
+                        size="icon"
+                        variant="destructive"
+                        aria-label="Remove vehicle"
+                        disabled={!$SelectedVehicleStore || $testState === 'running'}
+                        onclick={onRemoveVehicle}
+                    >
+                        <Trash2 class="h-4 w-4" />
+                    </Button>
                 </div>
             </div>
         </div>
