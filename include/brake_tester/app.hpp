@@ -18,6 +18,7 @@ class VehicleRepository;
 class LptRepository;
 class SelectedVehicleStore;
 class LptStore;
+class SerialDeviceStore;
 
 class App {
 public:
@@ -29,6 +30,7 @@ public:
 
 private:
   void startInputListener();
+  void startSerialDeviceRefreshLoop();
 
   std::atomic_bool m_IsInputListening{false};
   std::thread m_InputThread;
@@ -40,8 +42,11 @@ private:
   std::unique_ptr<LptRepository> m_LptRepository;
   std::unique_ptr<SelectedVehicleStore> m_SelectedVehicleStore;
   std::unique_ptr<LptStore> m_LptStore;
+  std::unique_ptr<SerialDeviceStore> m_SerialDeviceStore;
   std::unique_ptr<LptManager> m_LptManager;
   std::unique_ptr<BrakeTesterHttpServer> m_HttpServer;
+  std::thread m_SerialDeviceRefreshThread;
+  std::atomic_bool m_IsSerialDeviceRefreshRunning{false};
 };
 
 } // namespace brake_tester

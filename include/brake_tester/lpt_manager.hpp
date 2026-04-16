@@ -22,7 +22,7 @@ public:
 
   void start();
   void stop();
-  void sendTestSignal();
+  void sendTestSignal(bool enableTestFlag);
 
 private:
   static std::string generateCaptureFilenameWithoutExtension();

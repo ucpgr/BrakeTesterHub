@@ -46,14 +46,14 @@ LptListener::~LptListener() {
 }
 
 std::vector<std::uint8_t> LptListener::captureTransmission(const std::atomic_bool& shouldKeepRunning) {
-  const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
-  const auto endOfTransmissionSilenceTimeout = serialSettings.silenceTimeout;
+  SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
+  auto endOfTransmissionSilenceTimeout = serialSettings.silenceTimeout;
   std::vector<std::uint8_t> transmissionBuffer;
   transmissionBuffer.reserve(2048);
 
   ensureSerialPortOpen(serialSettings);
   if (m_Log) {
-    m_Log->information("[LptListener Info]: Waiting for serial bytes on " + serialSettings.devicePath + ".");
+    m_Log->information("[LptListener Info]: Waiting for serial bytes on " + serialSettings.lptDevicePath + ".");
   }
 
   bool hasCapturedData = false;
@@ -61,6 +61,12 @@ std::vector<std::uint8_t> LptListener::captureTransmission(const std::atomic_boo
   auto lastCapturedDataTimestamp = std::chrono::steady_clock::now();
 
   while (shouldKeepRunning) {
+    if (m_LptStore.consumeLptSerialDeviceChanged()) {
+      serialSettings = m_SettingsRepository.getSerialSettings();
+      endOfTransmissionSilenceTimeout = serialSettings.silenceTimeout;
+      ensureSerialPortOpen(serialSettings);
+    }
+
     std::uint8_t capturedByte = 0;
     bool didReadByte = false;
     try {
@@ -96,7 +102,7 @@ std::vector<std::uint8_t> LptListener::captureTransmission(const std::atomic_boo
         continue;
       }
 
-      throw std::runtime_error("[LptManager Error]: Serial read failed on device '" + serialSettings.devicePath +
+      throw std::runtime_error("[LptManager Error]: Serial read failed on device '" + serialSettings.lptDevicePath +
                                "'. Reason: " + readErrorReason);
     }
 
@@ -158,19 +164,19 @@ void LptListener::test() {
 }
 
 void LptListener::ensureSerialPortOpen(const SerialSettings& serialSettings) {
-  const bool shouldReopenPort = (!m_IsSerialPortOpen || m_OpenDevicePath != serialSettings.devicePath);
+  const bool shouldReopenPort = (!m_IsSerialPortOpen || m_OpenDevicePath != serialSettings.lptDevicePath);
   if (!shouldReopenPort) {
     return;
   }
 
   closeSerialPortIfOpen();
   if (m_Log) {
-    m_Log->information("[LptListener Info]: Opening serial device: " + serialSettings.devicePath);
+    m_Log->information("[LptListener Info]: Opening serial device: " + serialSettings.lptDevicePath);
   }
-  m_SerialPort.Open(serialSettings.devicePath);
+  m_SerialPort.Open(serialSettings.lptDevicePath);
   m_SerialPort.SetBaudRate(toBaudRate(serialSettings.baudRate));
   m_IsSerialPortOpen = true;
-  m_OpenDevicePath = serialSettings.devicePath;
+  m_OpenDevicePath = serialSettings.lptDevicePath;
   if (m_Log) {
     m_Log->information("[LptListener Info]: Serial device opened.");
   }

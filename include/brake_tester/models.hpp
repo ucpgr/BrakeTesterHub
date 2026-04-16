@@ -9,7 +9,8 @@
 namespace brake_tester {
 
 struct SerialSettings {
-  std::string devicePath{"/dev/ttyS0"};
+  std::string lptDevicePath{"/dev/ttyS0"};
+  std::string brakeTesterDevicePath{"/dev/ttyS1"};
   std::uint32_t baudRate{9600};
   std::chrono::milliseconds silenceTimeout{250};
   std::size_t readChunkSize{256};

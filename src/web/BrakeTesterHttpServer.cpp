@@ -5,18 +5,26 @@
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
+#include "brake_tester/lpt_manager.hpp"
+
 namespace brake_tester {
 
 BrakeTesterHttpServer::BrakeTesterHttpServer(ILptStore& lptStore,
+                                             ISettingsRepository& settingsRepository,
+                                             ISerialDeviceStore& serialDeviceStore,
                                              IVehicleRepository& vehicleRepository,
                                              ISelectedVehicleStore& selectedVehicleStore,
+                                             LptManager& lptManager,
                                              SharedLogger log,
                                              std::string host,
                                              int port,
                                              std::string staticRoot)
     : m_LptStore(lptStore),
+      m_SettingsRepository(settingsRepository),
+      m_SerialDeviceStore(serialDeviceStore),
       m_VehicleRepository(vehicleRepository),
       m_SelectedVehicleStore(selectedVehicleStore),
+      m_LptManager(lptManager),
       m_Log(std::move(log)),
       m_Host(std::move(host)),
       m_Port(port),
@@ -47,7 +55,9 @@ void BrakeTesterHttpServer::start() {
   configureLptModule();
   configureVehicleModule();
   configureStatusModule();
+  configureSettingsModule();
   startLptBroadcastLoop();
+  startSettingsBroadcastLoop();
 
   m_ServerThread = std::thread([this] {
     if (m_Log) {
@@ -75,6 +85,9 @@ void BrakeTesterHttpServer::stop() {
 
   if (m_LptBroadcastThread.joinable()) {
     m_LptBroadcastThread.join();
+  }
+  if (m_SettingsBroadcastThread.joinable()) {
+    m_SettingsBroadcastThread.join();
   }
 
   if (m_ServerThread.joinable()) {
@@ -294,6 +307,78 @@ void BrakeTesterHttpServer::configureVehicleModule() {
   });
 }
 
+void BrakeTesterHttpServer::configureSettingsModule() {
+  if (m_Log) {
+    m_Log->information("[BrakeTesterHttpServer Info]: Configuring settings websocket module at /settings.");
+  }
+
+  m_Server->WebSocket("/settings", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
+    {
+      std::scoped_lock lock(m_SettingsClientMutex);
+      m_SettingsClients.insert(&socket);
+    }
+
+    socket.send(buildSettingsStatePayload().dump());
+
+    std::string message;
+    while (m_IsRunning.load() && socket.read(message) != httplib::ws::Fail) {
+      try {
+        const auto payload = nlohmann::json::parse(message);
+        const std::string action = payload.value("action", "");
+        SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
+
+        if (action == "assign_lpt") {
+          const std::string devicePath = payload.value("devicePath", "");
+          if (!devicePath.empty() && devicePath != serialSettings.lptDevicePath) {
+            serialSettings.lptDevicePath = devicePath;
+            m_SettingsRepository.setSerialSettings(serialSettings);
+            m_LptStore.setLptSerialDeviceChanged(true);
+            broadcastStatus("info", "LPT serial device updated");
+            broadcastSettingsState();
+          }
+        } else if (action == "unassign_lpt") {
+          if (!serialSettings.lptDevicePath.empty()) {
+            serialSettings.lptDevicePath.clear();
+            m_SettingsRepository.setSerialSettings(serialSettings);
+            m_LptStore.setLptSerialDeviceChanged(true);
+            broadcastStatus("warning", "LPT serial device cleared");
+            broadcastSettingsState();
+          }
+        } else if (action == "assign_braketester") {
+          const std::string devicePath = payload.value("devicePath", "");
+          if (!devicePath.empty() && devicePath != serialSettings.brakeTesterDevicePath) {
+            serialSettings.brakeTesterDevicePath = devicePath;
+            m_SettingsRepository.setSerialSettings(serialSettings);
+            m_LptStore.setBrakeTesterSerialDeviceChanged(true);
+            broadcastStatus("info", "BrakeTester serial device updated");
+            broadcastSettingsState();
+          }
+        } else if (action == "unassign_braketester") {
+          if (!serialSettings.brakeTesterDevicePath.empty()) {
+            serialSettings.brakeTesterDevicePath.clear();
+            m_SettingsRepository.setSerialSettings(serialSettings);
+            m_LptStore.setBrakeTesterSerialDeviceChanged(true);
+            broadcastStatus("warning", "BrakeTester serial device cleared");
+            broadcastSettingsState();
+          }
+        } else if (action == "test_lpt") {
+          const bool setTestEnabled = payload.value("setTestEnabled", false);
+          m_LptManager.sendTestSignal(setTestEnabled);
+          broadcastStatus("progress", std::string("LPT test sent (") + (setTestEnabled ? "Test 1" : "Test 2") + ")");
+        }
+      } catch (const std::exception& ex) {
+        if (m_Log) {
+          m_Log->warning(std::string("[BrakeTesterHttpServer Warning]: Invalid /settings message: ") + ex.what());
+        }
+      }
+    }
+
+    {
+      std::scoped_lock lock(m_SettingsClientMutex);
+      m_SettingsClients.erase(&socket);
+    }
+  });
+}
 
 void BrakeTesterHttpServer::configureStatusModule() {
   if (m_Log) {
@@ -330,6 +415,50 @@ void BrakeTesterHttpServer::broadcastStatus(const std::string& level, const std:
   for (auto* socket : m_StatusClients) {
     if (socket != nullptr) {
       socket->send(payloadText);
+    }
+  }
+}
+
+void BrakeTesterHttpServer::startSettingsBroadcastLoop() {
+  m_SettingsBroadcastThread = std::thread([this] {
+    std::uint64_t lastSeenVersion = m_SerialDeviceStore.getVersion();
+
+    while (m_IsRunning.load()) {
+      std::vector<std::string> devices;
+      std::uint64_t version = lastSeenVersion;
+      if (!m_SerialDeviceStore.waitForVersionAfter(lastSeenVersion, std::chrono::milliseconds(250), devices, version)) {
+        continue;
+      }
+
+      lastSeenVersion = version;
+      broadcastSettingsState();
+    }
+  });
+}
+
+nlohmann::json BrakeTesterHttpServer::buildSettingsStatePayload() const {
+  const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
+  const auto devices = m_SerialDeviceStore.getDevices();
+
+  nlohmann::json deviceItems = nlohmann::json::array();
+  for (const auto& device : devices) {
+    deviceItems.push_back(device);
+  }
+
+  return {
+      {"event", "settings.state"},
+      {"serialDevices", deviceItems},
+      {"lptDevicePath", serialSettings.lptDevicePath},
+      {"brakeTesterDevicePath", serialSettings.brakeTesterDevicePath},
+  };
+}
+
+void BrakeTesterHttpServer::broadcastSettingsState() {
+  const std::string payload = buildSettingsStatePayload().dump();
+  std::scoped_lock lock(m_SettingsClientMutex);
+  for (auto* socket : m_SettingsClients) {
+    if (socket != nullptr) {
+      socket->send(payload);
     }
   }
 }
