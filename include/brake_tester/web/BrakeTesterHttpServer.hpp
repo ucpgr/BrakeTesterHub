@@ -1,22 +1,11 @@
 #pragma once
 
-#include <atomic>
 #include <memory>
-#include <mutex>
-#include <thread>
-#include <unordered_set>
 
 #include <nlohmann/json.hpp>
 
 #include "brake_tester/interfaces.hpp"
 #include "brake_tester/logging.hpp"
-
-namespace httplib {
-class Server;
-namespace ws {
-class WebSocket;
-} // namespace ws
-} // namespace httplib
 
 namespace brake_tester {
 
@@ -40,6 +29,8 @@ public:
   void stop();
 
 private:
+  struct Impl;
+
   void configureLptModule();
   void configureVehicleModule();
   void configureStatusModule();
@@ -63,24 +54,7 @@ private:
   std::string m_Host;
   int m_Port;
   std::string m_StaticRoot;
-
-  std::atomic_bool m_IsRunning{false};
-  std::unique_ptr<httplib::Server> m_Server;
-  std::thread m_ServerThread;
-
-  std::thread m_LptBroadcastThread;
-  std::thread m_SettingsBroadcastThread;
-  std::mutex m_LptClientMutex;
-  std::unordered_set<httplib::ws::WebSocket*> m_LptClients;
-
-  std::mutex m_VehicleClientMutex;
-  std::unordered_set<httplib::ws::WebSocket*> m_VehicleClients;
-
-  std::mutex m_StatusClientMutex;
-  std::unordered_set<httplib::ws::WebSocket*> m_StatusClients;
-
-  std::mutex m_SettingsClientMutex;
-  std::unordered_set<httplib::ws::WebSocket*> m_SettingsClients;
+  std::unique_ptr<Impl> m_Impl;
 };
 
 } // namespace brake_tester
