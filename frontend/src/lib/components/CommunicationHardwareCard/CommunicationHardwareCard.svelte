@@ -8,7 +8,7 @@
         brakeTesterDevicePath,
         connectSettingsSocket,
         disconnectSettingsSocket,
-        assignLptDevice,
+r        assignLptDevice,
         unassignLptDevice,
         assignBrakeTesterDevice,
         unassignBrakeTesterDevice,
