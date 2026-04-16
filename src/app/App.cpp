@@ -1,6 +1,8 @@
 #include "brake_tester/app.hpp"
 
 #include <chrono>
+#include <algorithm>
+#include <filesystem>
 #include <cstdio>
 #include <ctime>
 #include <iomanip>
@@ -8,6 +10,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <thread>
+#include <vector>
 
 #if defined(_WIN32)
 #include <conio.h>
@@ -20,6 +23,7 @@
 #include "brake_tester/components.hpp"
 #include "brake_tester/lpt_manager.hpp"
 #include "brake_tester/repositories.hpp"
+#include "brake_tester/stores/SerialDeviceStore.hpp"
 #include "brake_tester/web/BrakeTesterHttpServer.hpp"
 
 namespace brake_tester {
@@ -52,6 +56,36 @@ bool hasConsoleInputAvailable() {
   return selectResult > 0 && FD_ISSET(STDIN_FILENO, &readSet);
 #endif
 }
+
+std::vector<std::string> scanSerialDevices() {
+  std::vector<std::string> devices;
+  const std::vector<std::string> prefixes = {"ttyS", "ttyUSB", "ttyACM", "ttyAMA", "rfcomm", "stty"};
+
+  for (const auto& entry : std::filesystem::directory_iterator("/dev")) {
+    if (!entry.is_character_file() && !entry.is_symlink()) {
+      continue;
+    }
+
+    const std::string filename = entry.path().filename().string();
+    const bool matchesPrefix = std::any_of(prefixes.begin(), prefixes.end(), [&filename](const std::string& prefix) {
+      return filename.rfind(prefix, 0) == 0;
+    });
+    if (!matchesPrefix) {
+      continue;
+    }
+    devices.push_back(entry.path().string());
+  }
+
+  if (std::filesystem::exists("/dev/serial/by-id")) {
+    for (const auto& entry : std::filesystem::directory_iterator("/dev/serial/by-id")) {
+      devices.push_back(entry.path().string());
+    }
+  }
+
+  std::sort(devices.begin(), devices.end());
+  devices.erase(std::unique(devices.begin(), devices.end()), devices.end());
+  return devices;
+}
 } // namespace
 
 App::App(std::string databasePath) {
@@ -68,6 +102,7 @@ App::App(std::string databasePath) {
   m_LptRepository = std::make_unique<LptRepository>(m_DatabaseHandle, m_Log);
   m_SelectedVehicleStore = std::make_unique<SelectedVehicleStore>();
   m_LptStore = std::make_unique<LptStore>();
+  m_SerialDeviceStore = std::make_unique<SerialDeviceStore>();
 
   auto listener = std::make_unique<LptListener>(*m_SettingsRepository, *m_LptStore, m_Log);
   auto patcher = std::make_unique<PrnPatcher>(*m_SelectedVehicleStore, m_Log);
@@ -114,8 +149,11 @@ App::App(std::string databasePath) {
 
   m_HttpServer = std::make_unique<BrakeTesterHttpServer>(
       *m_LptStore,
+      *m_SettingsRepository,
+      *m_SerialDeviceStore,
       *m_VehicleRepository,
       *m_SelectedVehicleStore,
+      *m_LptManager,
       m_Log,
       "0.0.0.0",
       80,
@@ -133,6 +171,7 @@ void App::run() {
   }
   m_LptManager->start();
   m_HttpServer->start();
+  startSerialDeviceRefreshLoop();
   startInputListener();
 }
 
@@ -148,6 +187,11 @@ void App::shutdown() {
 
   if (m_HttpServer) {
     m_HttpServer->stop();
+  }
+
+  m_IsSerialDeviceRefreshRunning = false;
+  if (m_SerialDeviceRefreshThread.joinable()) {
+    m_SerialDeviceRefreshThread.join();
   }
 
   if (m_LptManager) {
@@ -200,9 +244,28 @@ void App::startInputListener() {
       }
 
       if (consoleInput == "t") {
-        m_LptStore->setLptTestEnabled(true);
-        m_LptManager->sendTestSignal();
+        m_LptManager->sendTestSignal(true);
       }
+    }
+  });
+}
+
+void App::startSerialDeviceRefreshLoop() {
+  if (m_IsSerialDeviceRefreshRunning.exchange(true)) {
+    return;
+  }
+
+  m_SerialDeviceRefreshThread = std::thread([this]() {
+    while (m_IsSerialDeviceRefreshRunning) {
+      try {
+        m_SerialDeviceStore->setDevices(scanSerialDevices());
+      } catch (const std::exception& exception) {
+        if (m_Log) {
+          m_Log->warning(std::string("[App Warning]: Failed to refresh serial devices. ") + exception.what());
+        }
+      }
+
+      std::this_thread::sleep_for(std::chrono::seconds(1));
     }
   });
 }

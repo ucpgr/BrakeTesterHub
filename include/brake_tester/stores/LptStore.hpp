@@ -20,6 +20,10 @@ public:
   void setProcessStatus(LptProcessStatus status) override;
   bool isLptTestEnabled() const override;
   void setLptTestEnabled(bool enabled) override;
+  bool consumeLptSerialDeviceChanged() override;
+  void setLptSerialDeviceChanged(bool changed) override;
+  bool consumeBrakeTesterSerialDeviceChanged() override;
+  void setBrakeTesterSerialDeviceChanged(bool changed) override;
   std::uint64_t getProcessStatusVersion() const override;
   bool waitForProcessStatusAfter(std::uint64_t afterVersion,
                                  std::chrono::milliseconds timeout,
@@ -35,6 +39,8 @@ private:
 
   LptProcessStatus m_ProcessStatus{LptProcessStatus::Idle};
   bool m_LptTestEnabled{false};
+  bool m_LptSerialDeviceChanged{false};
+  bool m_BrakeTesterSerialDeviceChanged{false};
   std::uint64_t m_ProcessStatusVersion{0};
 };
 
