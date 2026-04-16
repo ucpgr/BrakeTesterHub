@@ -38,7 +38,7 @@ export function connectStatusSocket() {
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    statusSocket = new WebSocket(`${protocol}//${window.location.host}/status`);
+    statusSocket = new WebSocket(`${protocol}//${window.location.host}/api/status`);
 
     statusSocket.onopen = () => {
         isOnline.set(true);
@@ -59,7 +59,7 @@ export function connectStatusSocket() {
                 text: nextStatus.text
             });
         } catch (error) {
-            console.warn('Failed to parse /status message', error);
+            console.warn('Failed to parse /api/status message', error);
         }
     };
 
