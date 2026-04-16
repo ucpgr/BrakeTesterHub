@@ -2,8 +2,6 @@
 
 #include <memory>
 
-#include <nlohmann/json.hpp>
-
 #include "brake_tester/interfaces.hpp"
 #include "brake_tester/logging.hpp"
 
@@ -39,8 +37,8 @@ private:
   void startSettingsBroadcastLoop();
   void broadcastVehicleState();
   void broadcastSettingsState();
-  nlohmann::json buildVehicleStatePayload() const;
-  nlohmann::json buildSettingsStatePayload() const;
+  std::string buildVehicleStatePayloadText() const;
+  std::string buildSettingsStatePayloadText() const;
   std::string lptEventNameForStatus(LptProcessStatus status) const;
   void broadcastStatus(const std::string& level, const std::string& text);
 

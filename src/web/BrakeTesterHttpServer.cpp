@@ -290,7 +290,7 @@ void BrakeTesterHttpServer::configureVehicleModule() {
       m_Impl->vehicleClients.insert(&socket);
     }
 
-    socket.send(buildVehicleStatePayload().dump());
+    socket.send(buildVehicleStatePayloadText());
 
     std::string message;
     while (m_Impl->isRunning.load() && socket.read(message) != httplib::ws::Fail) {
@@ -425,7 +425,7 @@ void BrakeTesterHttpServer::configureSettingsModule() {
       m_Impl->settingsClients.insert(&socket);
     }
 
-    socket.send(buildSettingsStatePayload().dump());
+    socket.send(buildSettingsStatePayloadText());
 
     std::string message;
     while (m_Impl->isRunning.load() && socket.read(message) != httplib::ws::Fail) {
@@ -549,7 +549,7 @@ void BrakeTesterHttpServer::startSettingsBroadcastLoop() {
   });
 }
 
-nlohmann::json BrakeTesterHttpServer::buildSettingsStatePayload() const {
+std::string BrakeTesterHttpServer::buildSettingsStatePayloadText() const {
   const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
   const auto devices = m_SerialDeviceStore.getDevices();
 
@@ -558,16 +558,17 @@ nlohmann::json BrakeTesterHttpServer::buildSettingsStatePayload() const {
     deviceItems.push_back(device);
   }
 
-  return {
+  const nlohmann::json payload = {
       {"event", "settings.state"},
       {"serialDevices", deviceItems},
       {"lptDevicePath", serialSettings.lptDevicePath},
       {"brakeTesterDevicePath", serialSettings.brakeTesterDevicePath},
   };
+  return payload.dump();
 }
 
 void BrakeTesterHttpServer::broadcastSettingsState() {
-  const std::string payload = buildSettingsStatePayload().dump();
+  const std::string payload = buildSettingsStatePayloadText();
   std::scoped_lock lock(m_Impl->settingsClientMutex);
   for (auto* socket : m_Impl->settingsClients) {
     if (socket != nullptr) {
@@ -576,7 +577,7 @@ void BrakeTesterHttpServer::broadcastSettingsState() {
   }
 }
 
-nlohmann::json BrakeTesterHttpServer::buildVehicleStatePayload() const {
+std::string BrakeTesterHttpServer::buildVehicleStatePayloadText() const {
   const auto vehicles = m_VehicleRepository.getVehicles();
   const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
 
@@ -601,15 +602,16 @@ nlohmann::json BrakeTesterHttpServer::buildVehicleStatePayload() const {
   const nlohmann::json selectedVehicleId = selectedVehicle.id > 0 ? nlohmann::json(selectedVehicle.id)
                                                                  : nlohmann::json(nullptr);
 
-  return {
+  const nlohmann::json payload = {
       {"event", "vehicles.state"},
       {"vehicles", vehicleItems},
       {"selectedVehicleId", selectedVehicleId},
   };
+  return payload.dump();
 }
 
 void BrakeTesterHttpServer::broadcastVehicleState() {
-  const std::string payload = buildVehicleStatePayload().dump();
+  const std::string payload = buildVehicleStatePayloadText();
   std::scoped_lock lock(m_Impl->vehicleClientMutex);
   for (auto* socket : m_Impl->vehicleClients) {
     if (socket != nullptr) {
