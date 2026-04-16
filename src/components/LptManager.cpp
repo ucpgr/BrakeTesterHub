@@ -44,7 +44,8 @@ void LptManager::start() {
   if (m_Log) {
     const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
     m_Log->information("[LptManager Info]: Starting worker thread.");
-    m_Log->information("[LptManager Info]: Serial settings -> devicePath=" + serialSettings.devicePath +
+    m_Log->information("[LptManager Info]: Serial settings -> lptDevicePath=" + serialSettings.lptDevicePath +
+                       ", brakeTesterDevicePath=" + serialSettings.brakeTesterDevicePath +
                        ", baudRate=" + std::to_string(serialSettings.baudRate) + ", readChunkSize=" +
                        std::to_string(serialSettings.readChunkSize) + ", silenceTimeoutMs=" +
                        std::to_string(serialSettings.silenceTimeout.count()));
@@ -122,11 +123,13 @@ void LptManager::stop() {
   }
 }
 
-void LptManager::sendTestSignal() {
+void LptManager::sendTestSignal(bool enableTestFlag) {
   try {
+    m_LptStore.setLptTestEnabled(enableTestFlag);
     m_Listener->test();
     if (m_Log) {
-      m_Log->information("[LptManager Info]: Test signal sent.");
+      m_Log->information(std::string("[LptManager Info]: Test signal sent. testEnabled=") +
+                         (enableTestFlag ? "true" : "false"));
     }
   } catch (const std::exception& testException) {
     if (m_Log) {

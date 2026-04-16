@@ -46,6 +46,30 @@ void LptStore::setLptTestEnabled(bool enabled) {
   m_LptTestEnabled = enabled;
 }
 
+bool LptStore::consumeLptSerialDeviceChanged() {
+  std::scoped_lock lock(m_Mutex);
+  const bool changed = m_LptSerialDeviceChanged;
+  m_LptSerialDeviceChanged = false;
+  return changed;
+}
+
+void LptStore::setLptSerialDeviceChanged(bool changed) {
+  std::scoped_lock lock(m_Mutex);
+  m_LptSerialDeviceChanged = changed;
+}
+
+bool LptStore::consumeBrakeTesterSerialDeviceChanged() {
+  std::scoped_lock lock(m_Mutex);
+  const bool changed = m_BrakeTesterSerialDeviceChanged;
+  m_BrakeTesterSerialDeviceChanged = false;
+  return changed;
+}
+
+void LptStore::setBrakeTesterSerialDeviceChanged(bool changed) {
+  std::scoped_lock lock(m_Mutex);
+  m_BrakeTesterSerialDeviceChanged = changed;
+}
+
 std::uint64_t LptStore::getProcessStatusVersion() const {
   std::scoped_lock lock(m_Mutex);
   return m_ProcessStatusVersion;
