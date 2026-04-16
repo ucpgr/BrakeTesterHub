@@ -2,7 +2,7 @@ import { Activity, Settings, History } from 'lucide-svelte';
 
 export const routes = [
     {
-        path: '/live',
+        path: '/',
         label: 'Live',
         icon: Activity,
         nav: true
