@@ -1,6 +1,7 @@
 #include "brake_tester/web/BrakeTesterHttpServer.hpp"
 
 #include <chrono>
+#include <vector>
 
 #include <httplib.h>
 #include <nlohmann/json.hpp>
@@ -88,6 +89,34 @@ void BrakeTesterHttpServer::stop() {
       m_Log->information("[BrakeTesterHttpServer Info]: httplib::Server::stop() returned.");
     }
   }
+
+  const auto closeSockets = [this](const char* channelName,
+                                   std::mutex& clientMutex,
+                                   std::unordered_set<httplib::ws::WebSocket*>& clients) {
+    std::vector<httplib::ws::WebSocket*> socketsToClose;
+    {
+      std::scoped_lock lock(clientMutex);
+      socketsToClose.reserve(clients.size());
+      for (auto* socket : clients) {
+        if (socket != nullptr) {
+          socketsToClose.push_back(socket);
+        }
+      }
+    }
+
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: Closing " + std::to_string(socketsToClose.size()) +
+                         " websocket client(s) for " + channelName + ".");
+    }
+    for (auto* socket : socketsToClose) {
+      socket->close();
+    }
+  };
+
+  closeSockets("/lpt", m_LptClientMutex, m_LptClients);
+  closeSockets("/vehicles", m_VehicleClientMutex, m_VehicleClients);
+  closeSockets("/status", m_StatusClientMutex, m_StatusClients);
+  closeSockets("/settings", m_SettingsClientMutex, m_SettingsClients);
 
   if (m_LptBroadcastThread.joinable()) {
     if (m_Log) {
