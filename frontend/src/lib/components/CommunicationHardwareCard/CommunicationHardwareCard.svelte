@@ -2,19 +2,17 @@
     import { onMount, onDestroy } from 'svelte';
     import { Card, CardHeader, CardTitle, CardContent } from '$lib/components/ui/card';
     import { Button } from '$lib/components/ui/button';
-    import {
-        availableUnassignedDevices,
-        lptDevicePath,
-        brakeTesterDevicePath,
-        connectSettingsSocket,
-        disconnectSettingsSocket,
-r        assignLptDevice,
-        unassignLptDevice,
-        assignBrakeTesterDevice,
-        unassignBrakeTesterDevice,
-        runLptTest1,
-        runLptTest2
-    } from '$lib/stores/settings';
+    import { availableUnassignedDevices } from '$lib/stores/settings';
+    import { lptDevicePath } from '$lib/stores/settings';
+    import { brakeTesterDevicePath } from '$lib/stores/settings';
+    import { connectSettingsSocket } from '$lib/stores/settings';
+    import { disconnectSettingsSocket } from '$lib/stores/settings';
+    import { assignLptDevice } from '$lib/stores/settings';
+    import { unassignLptDevice } from '$lib/stores/settings';
+    import { assignBrakeTesterDevice } from '$lib/stores/settings';
+    import { unassignBrakeTesterDevice } from '$lib/stores/settings';
+    import { runLptTest1 } from '$lib/stores/settings';
+    import { runLptTest2 } from '$lib/stores/settings';
 
     let selectedDevice = '';
 
