@@ -29,11 +29,8 @@ public:
   void shutdown();
 
 private:
-  void startInputListener();
   void startSerialDeviceRefreshLoop();
 
-  std::atomic_bool m_IsInputListening{false};
-  std::thread m_InputThread;
   SharedLogger m_Log;
   sqlite3* m_DatabaseHandle{nullptr};
 

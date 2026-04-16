@@ -119,7 +119,19 @@ void LptManager::stop() {
   }
 
   if (m_WorkerThread.joinable()) {
+    if (m_Log) {
+      m_Log->information("[LptManager Info]: Waiting for worker thread to join.");
+    }
     m_WorkerThread.join();
+    if (m_Log) {
+      m_Log->information("[LptManager Info]: Worker thread joined.");
+    }
+  } else if (m_Log) {
+    m_Log->information("[LptManager Info]: Worker thread was not joinable during stop.");
+  }
+
+  if (m_Log) {
+    m_Log->information("[LptManager Info]: Stop sequence completed.");
   }
 }
 
