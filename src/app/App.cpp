@@ -7,6 +7,7 @@
 #include <ctime>
 #include <iomanip>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <thread>
@@ -40,6 +41,31 @@ std::string formatCurrentUtc(const char* formatPattern) {
   std::ostringstream textStream;
   textStream << std::put_time(&utcTime, formatPattern);
   return textStream.str();
+}
+
+std::string formatPrnField(const std::string& value, std::size_t fieldLength) {
+  const std::string trimmedValue = value.substr(0, fieldLength);
+  if (trimmedValue.size() >= fieldLength) {
+    return trimmedValue;
+  }
+
+  return trimmedValue + std::string(fieldLength - trimmedValue.size(), ' ');
+}
+
+std::string formatMileageForPrn(const std::optional<std::string>& mileage) {
+  if (!mileage.has_value() || mileage->empty()) {
+    return std::string();
+  }
+
+  std::string formattedMileage = *mileage;
+  const auto endsWithKm = formattedMileage.size() >= 2 &&
+                          (formattedMileage.substr(formattedMileage.size() - 2) == "km" ||
+                           formattedMileage.substr(formattedMileage.size() - 2) == "KM");
+  if (!endsWithKm) {
+    formattedMileage += "km";
+  }
+
+  return formattedMileage;
 }
 
 bool hasConsoleInputAvailable() {
@@ -116,17 +142,29 @@ App::App(std::string databasePath) {
     return m_LptStore->isLptTestEnabled() ? std::string("TEST") : std::string();
   });
 
-  patcher->addPatch(0x2744, [this](const VehicleSelection&) { // licence length 27
-    return m_LptStore->isLptTestEnabled() ? std::string("TEST") : std::string();
+  patcher->addPatch(0x2744, [this](const VehicleSelection& selectedVehicle) { // licence length 27
+    if (m_LptStore->isLptTestEnabled()) {
+      return formatPrnField("TEST", 27);
+    }
+    return formatPrnField(selectedVehicle.reg, 27);
   });
-  patcher->addPatch(0x2794, [this](const VehicleSelection&) { // make length 27
-    return m_LptStore->isLptTestEnabled() ? std::string("TEST") : std::string();
+  patcher->addPatch(0x2794, [this](const VehicleSelection& selectedVehicle) { // make length 27
+    if (m_LptStore->isLptTestEnabled()) {
+      return formatPrnField("TEST", 27);
+    }
+    return formatPrnField(selectedVehicle.make, 27);
   });
-  patcher->addPatch(0x27e4, [this](const VehicleSelection&) { // model length 27
-    return m_LptStore->isLptTestEnabled() ? std::string("TEST") : std::string();
+  patcher->addPatch(0x27e4, [this](const VehicleSelection& selectedVehicle) { // model length 27
+    if (m_LptStore->isLptTestEnabled()) {
+      return formatPrnField("TEST", 27);
+    }
+    return formatPrnField(selectedVehicle.model, 27);
   });
-  patcher->addPatch(0x2834, [this](const VehicleSelection&) { // mileage length 27
-    return m_LptStore->isLptTestEnabled() ? std::string("TEST") : std::string();
+  patcher->addPatch(0x2834, [this](const VehicleSelection& selectedVehicle) { // mileage length 27
+    if (m_LptStore->isLptTestEnabled()) {
+      return formatPrnField("TEST", 27);
+    }
+    return formatPrnField(formatMileageForPrn(selectedVehicle.mileage), 27);
   });
 
   patcher->addPatch(0x27c1, [](const VehicleSelection&) { // testDate length 8

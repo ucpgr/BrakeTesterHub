@@ -127,30 +127,11 @@ void BrakeTesterHttpServer::configureLptModule() {
 void BrakeTesterHttpServer::startLptBroadcastLoop() {
   m_LptBroadcastThread = std::thread([this] {
     std::uint64_t lastSeenVersion = m_LptStore.getProcessStatusVersion();
+    LptProcessStatus lastBroadcastStatus = LptProcessStatus::Idle;
+    auto lastStatusBroadcastAt = std::chrono::steady_clock::now();
+    constexpr auto progressStatusRefreshInterval = std::chrono::seconds(3);
 
-    while (m_IsRunning.load()) {
-      LptProcessStatus status = LptProcessStatus::Idle;
-      std::uint64_t version = lastSeenVersion;
-
-      if (!m_LptStore.waitForProcessStatusAfter(lastSeenVersion, std::chrono::milliseconds(250), status, version)) {
-        continue;
-      }
-
-      lastSeenVersion = version;
-      nlohmann::json payload{{"event", lptEventNameForStatus(status)}};
-      const auto payloadText = payload.dump();
-
-      std::scoped_lock lock(m_LptClientMutex);
-      if (m_Log) {
-        m_Log->information("[BrakeTesterHttpServer Info]: Broadcasting LPT event to " +
-                           std::to_string(m_LptClients.size()) + " client(s): " + payloadText);
-      }
-      for (auto* socket : m_LptClients) {
-        if (socket != nullptr) {
-          socket->send(payloadText);
-        }
-      }
-
+    const auto broadcastTopBarStatus = [this](LptProcessStatus status) {
       switch (status) {
         case LptProcessStatus::TransferStarted:
           broadcastStatus("progress", "Capture transfer started");
@@ -168,6 +149,43 @@ void BrakeTesterHttpServer::startLptBroadcastLoop() {
           broadcastStatus("idle", "Idle");
           break;
       }
+    };
+
+    while (m_IsRunning.load()) {
+      LptProcessStatus status = LptProcessStatus::Idle;
+      std::uint64_t version = lastSeenVersion;
+
+      if (!m_LptStore.waitForProcessStatusAfter(lastSeenVersion, std::chrono::milliseconds(250), status, version)) {
+        const auto now = std::chrono::steady_clock::now();
+        const bool shouldRefreshProgressStatus =
+            (lastBroadcastStatus == LptProcessStatus::TransferStarted ||
+             lastBroadcastStatus == LptProcessStatus::ConversionStarted) &&
+            (now - lastStatusBroadcastAt >= progressStatusRefreshInterval);
+        if (shouldRefreshProgressStatus) {
+          broadcastTopBarStatus(lastBroadcastStatus);
+          lastStatusBroadcastAt = now;
+        }
+        continue;
+      }
+
+      lastSeenVersion = version;
+      lastBroadcastStatus = status;
+      nlohmann::json payload{{"event", lptEventNameForStatus(status)}};
+      const auto payloadText = payload.dump();
+
+      std::scoped_lock lock(m_LptClientMutex);
+      if (m_Log) {
+        m_Log->information("[BrakeTesterHttpServer Info]: Broadcasting LPT event to " +
+                           std::to_string(m_LptClients.size()) + " client(s): " + payloadText);
+      }
+      for (auto* socket : m_LptClients) {
+        if (socket != nullptr) {
+          socket->send(payloadText);
+        }
+      }
+
+      broadcastTopBarStatus(status);
+      lastStatusBroadcastAt = std::chrono::steady_clock::now();
     }
   });
 }
