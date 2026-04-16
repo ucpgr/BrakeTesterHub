@@ -22,7 +22,7 @@ export function connectVehicleSocket() {
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    vehicleSocket = new WebSocket(`${protocol}//${window.location.host}/vehicles`);
+    vehicleSocket = new WebSocket(`${protocol}//${window.location.host}/api/vehicles`);
 
     vehicleSocket.onmessage = (event) => {
         try {
@@ -32,7 +32,7 @@ export function connectVehicleSocket() {
             VehicleListStore.set(Array.isArray(payload.vehicles) ? payload.vehicles : []);
             SelectedVehicleStore.set(payload.selectedVehicleId ?? null);
         } catch (error) {
-            console.warn('Failed to parse /vehicles message', error);
+            console.warn('Failed to parse /api/vehicles message', error);
         }
     };
 

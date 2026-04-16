@@ -23,7 +23,7 @@ export function connectSettingsSocket() {
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    settingsSocket = new WebSocket(`${protocol}//${window.location.host}/settings`);
+    settingsSocket = new WebSocket(`${protocol}//${window.location.host}/api/settings`);
 
     settingsSocket.onmessage = (event) => {
         try {
@@ -34,7 +34,7 @@ export function connectSettingsSocket() {
             lptDevicePath.set(payload.lptDevicePath ?? '');
             brakeTesterDevicePath.set(payload.brakeTesterDevicePath ?? '');
         } catch (error) {
-            console.warn('Failed to parse /settings message', error);
+            console.warn('Failed to parse /api/settings message', error);
         }
     };
 
