@@ -3,7 +3,6 @@ import { writable, derived } from 'svelte/store';
 export const serialDevices = writable([]);
 export const lptDevicePath = writable('');
 export const brakeTesterDevicePath = writable('');
-export const selectedSerialDevice = writable('');
 
 let settingsSocket = null;
 
@@ -51,10 +50,6 @@ export function disconnectSettingsSocket() {
     if (!settingsSocket) return;
     settingsSocket.close();
     settingsSocket = null;
-}
-
-export function selectSerialDevice(devicePath) {
-    selectedSerialDevice.set(devicePath ?? '');
 }
 
 export function assignLptDevice(devicePath) {

@@ -4,19 +4,19 @@
     import { Button } from '$lib/components/ui/button';
     import {
         availableUnassignedDevices,
-        selectedSerialDevice,
         lptDevicePath,
         brakeTesterDevicePath,
         connectSettingsSocket,
         disconnectSettingsSocket,
-        selectSerialDevice,
-        assignLptDevice,
+r        assignLptDevice,
         unassignLptDevice,
         assignBrakeTesterDevice,
         unassignBrakeTesterDevice,
         runLptTest1,
         runLptTest2
     } from '$lib/stores/settings';
+
+    let selectedDevice = '';
 
     onMount(() => {
         connectSettingsSocket();
@@ -27,13 +27,17 @@
     });
 
     function assignToLpt() {
-        assignLptDevice($selectedSerialDevice);
-        selectSerialDevice('');
+        assignLptDevice(selectedDevice);
+        selectedDevice = '';
     }
 
     function assignToBrakeTester() {
-        assignBrakeTesterDevice($selectedSerialDevice);
-        selectSerialDevice('');
+        assignBrakeTesterDevice(selectedDevice);
+        selectedDevice = '';
+    }
+
+    $: if (selectedDevice && !$availableUnassignedDevices.includes(selectedDevice)) {
+        selectedDevice = '';
     }
 </script>
 
@@ -43,24 +47,21 @@
     </CardHeader>
 
     <CardContent class="space-y-4 text-foreground">
-        <div class="grid gap-4 md:grid-cols-[1fr_auto_1fr]">
+        <div class="grid gap-4 lg:grid-cols-[1fr_28rem]">
             <div class="space-y-3">
-                <div class="grid grid-cols-[7rem_1fr_auto] items-center gap-2">
+                <div class="grid grid-cols-[7rem_1fr_auto_auto] items-center gap-2">
                     <span class="text-sm text-muted-foreground">Lpt:</span>
                     <input class="h-9 rounded-md border border-border bg-muted px-2 text-sm text-foreground" readonly value={$lptDevicePath || 'Unassigned'} />
-                    <Button variant="secondary" size="icon" on:click={assignToLpt} disabled={!$selectedSerialDevice} aria-label="Assign selected serial device to Lpt">&lt;</Button>
+                    <Button variant="secondary" size="icon" on:click={assignToLpt} disabled={!selectedDevice} aria-label="Assign selected serial device to Lpt">&lt;</Button>
+                    <Button variant="outline" size="icon" on:click={unassignLptDevice} disabled={!$lptDevicePath} aria-label="Unassign Lpt serial device">&gt;</Button>
                 </div>
 
-                <div class="grid grid-cols-[7rem_1fr_auto] items-center gap-2">
+                <div class="grid grid-cols-[7rem_1fr_auto_auto] items-center gap-2">
                     <span class="text-sm text-muted-foreground">BrakeTester:</span>
                     <input class="h-9 rounded-md border border-border bg-muted px-2 text-sm text-foreground" readonly value={$brakeTesterDevicePath || 'Unassigned'} />
-                    <Button variant="secondary" size="icon" on:click={assignToBrakeTester} disabled={!$selectedSerialDevice} aria-label="Assign selected serial device to BrakeTester">&lt;</Button>
+                    <Button variant="secondary" size="icon" on:click={assignToBrakeTester} disabled={!selectedDevice} aria-label="Assign selected serial device to BrakeTester">&lt;</Button>
+                    <Button variant="outline" size="icon" on:click={unassignBrakeTesterDevice} disabled={!$brakeTesterDevicePath} aria-label="Unassign BrakeTester serial device">&gt;</Button>
                 </div>
-            </div>
-
-            <div class="flex flex-col gap-2 justify-center">
-                <Button variant="outline" on:click={unassignLptDevice} disabled={!$lptDevicePath} aria-label="Unassign Lpt serial device">&gt; Lpt</Button>
-                <Button variant="outline" on:click={unassignBrakeTesterDevice} disabled={!$brakeTesterDevicePath} aria-label="Unassign BrakeTester serial device">&gt; BrakeTester</Button>
             </div>
 
             <div>
@@ -69,8 +70,7 @@
                     id="serial-device-list"
                     size="8"
                     class="w-full rounded-md border border-border bg-muted p-2 text-sm text-foreground"
-                    bind:value={$selectedSerialDevice}
-                    on:change={(e) => selectSerialDevice(e.currentTarget.value)}
+                    bind:value={selectedDevice}
                 >
                     {#if $availableUnassignedDevices.length === 0}
                         <option disabled>(No unassigned serial devices found)</option>
