@@ -1,6 +1,10 @@
 #include "brake_tester/web/BrakeTesterHttpServer.hpp"
 
+#include <atomic>
 #include <chrono>
+#include <mutex>
+#include <thread>
+#include <unordered_set>
 #include <vector>
 
 #include <httplib.h>
@@ -9,6 +13,26 @@
 #include "brake_tester/lpt_manager.hpp"
 
 namespace brake_tester {
+
+struct BrakeTesterHttpServer::Impl {
+  std::atomic_bool isRunning{false};
+  std::unique_ptr<httplib::Server> server{std::make_unique<httplib::Server>()};
+  std::thread serverThread;
+
+  std::thread lptBroadcastThread;
+  std::thread settingsBroadcastThread;
+  std::mutex lptClientMutex;
+  std::unordered_set<httplib::ws::WebSocket*> lptClients;
+
+  std::mutex vehicleClientMutex;
+  std::unordered_set<httplib::ws::WebSocket*> vehicleClients;
+
+  std::mutex statusClientMutex;
+  std::unordered_set<httplib::ws::WebSocket*> statusClients;
+
+  std::mutex settingsClientMutex;
+  std::unordered_set<httplib::ws::WebSocket*> settingsClients;
+};
 
 BrakeTesterHttpServer::BrakeTesterHttpServer(ILptStore& lptStore,
                                              ISettingsRepository& settingsRepository,
@@ -30,7 +54,7 @@ BrakeTesterHttpServer::BrakeTesterHttpServer(ILptStore& lptStore,
       m_Host(std::move(host)),
       m_Port(port),
       m_StaticRoot(std::move(staticRoot)),
-      m_Server(std::make_unique<httplib::Server>()) {
+      m_Impl(std::make_unique<Impl>()) {
   if (m_Log) {
     m_Log->information("[BrakeTesterHttpServer Info]: Constructed for " + m_Host + ":" + std::to_string(m_Port) +
                        ", staticRoot=" + m_StaticRoot);
@@ -42,14 +66,14 @@ BrakeTesterHttpServer::~BrakeTesterHttpServer() {
 }
 
 void BrakeTesterHttpServer::start() {
-  if (m_IsRunning.exchange(true)) {
+  if (m_Impl->isRunning.exchange(true)) {
     if (m_Log) {
       m_Log->warning("[BrakeTesterHttpServer Warning]: Start requested while server already running.");
     }
     return;
   }
 
-  m_Server->set_mount_point("/", m_StaticRoot);
+  m_Impl->server->set_mount_point("/", m_StaticRoot);
   if (m_Log) {
     m_Log->information("[BrakeTesterHttpServer Info]: Mounted static files at '/' from " + m_StaticRoot);
   }
@@ -60,17 +84,17 @@ void BrakeTesterHttpServer::start() {
   startLptBroadcastLoop();
   startSettingsBroadcastLoop();
 
-  m_ServerThread = std::thread([this] {
+  m_Impl->serverThread = std::thread([this] {
     if (m_Log) {
       m_Log->information("[BrakeTesterHttpServer Info]: HTTP server listening on " + m_Host + ":" +
                          std::to_string(m_Port));
     }
-    m_Server->listen(m_Host, m_Port);
+    m_Impl->server->listen(m_Host, m_Port);
   });
 }
 
 void BrakeTesterHttpServer::stop() {
-  if (!m_IsRunning.exchange(false)) {
+  if (!m_Impl->isRunning.exchange(false)) {
     if (m_Log) {
       m_Log->warning("[BrakeTesterHttpServer Warning]: Stop requested while server not running.");
     }
@@ -80,11 +104,11 @@ void BrakeTesterHttpServer::stop() {
     m_Log->information("[BrakeTesterHttpServer Info]: Stopping HTTP server.");
   }
 
-  if (m_Server) {
+  if (m_Impl->server) {
     if (m_Log) {
       m_Log->information("[BrakeTesterHttpServer Info]: Calling httplib::Server::stop().");
     }
-    m_Server->stop();
+    m_Impl->server->stop();
     if (m_Log) {
       m_Log->information("[BrakeTesterHttpServer Info]: httplib::Server::stop() returned.");
     }
@@ -113,35 +137,35 @@ void BrakeTesterHttpServer::stop() {
     }
   };
 
-  closeSockets("/api/lpt", m_LptClientMutex, m_LptClients);
-  closeSockets("/api/vehicles", m_VehicleClientMutex, m_VehicleClients);
-  closeSockets("/api/status", m_StatusClientMutex, m_StatusClients);
-  closeSockets("/api/settings", m_SettingsClientMutex, m_SettingsClients);
+  closeSockets("/api/lpt", m_Impl->lptClientMutex, m_Impl->lptClients);
+  closeSockets("/api/vehicles", m_Impl->vehicleClientMutex, m_Impl->vehicleClients);
+  closeSockets("/api/status", m_Impl->statusClientMutex, m_Impl->statusClients);
+  closeSockets("/api/settings", m_Impl->settingsClientMutex, m_Impl->settingsClients);
 
-  if (m_LptBroadcastThread.joinable()) {
+  if (m_Impl->lptBroadcastThread.joinable()) {
     if (m_Log) {
       m_Log->information("[BrakeTesterHttpServer Info]: Waiting for LPT broadcast thread to join.");
     }
-    m_LptBroadcastThread.join();
+    m_Impl->lptBroadcastThread.join();
     if (m_Log) {
       m_Log->information("[BrakeTesterHttpServer Info]: LPT broadcast thread joined.");
     }
   }
-  if (m_SettingsBroadcastThread.joinable()) {
+  if (m_Impl->settingsBroadcastThread.joinable()) {
     if (m_Log) {
       m_Log->information("[BrakeTesterHttpServer Info]: Waiting for settings broadcast thread to join.");
     }
-    m_SettingsBroadcastThread.join();
+    m_Impl->settingsBroadcastThread.join();
     if (m_Log) {
       m_Log->information("[BrakeTesterHttpServer Info]: Settings broadcast thread joined.");
     }
   }
 
-  if (m_ServerThread.joinable()) {
+  if (m_Impl->serverThread.joinable()) {
     if (m_Log) {
       m_Log->information("[BrakeTesterHttpServer Info]: Waiting for HTTP server listener thread to join.");
     }
-    m_ServerThread.join();
+    m_Impl->serverThread.join();
     if (m_Log) {
       m_Log->information("[BrakeTesterHttpServer Info]: HTTP server listener thread joined.");
     }
@@ -158,33 +182,33 @@ void BrakeTesterHttpServer::configureLptModule() {
   if (m_Log) {
     m_Log->information("[BrakeTesterHttpServer Info]: Configuring LPT websocket module at /api/lpt.");
   }
-  m_Server->WebSocket("/api/lpt", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
+  m_Impl->server->WebSocket("/api/lpt", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
     {
-      std::scoped_lock lock(m_LptClientMutex);
-      m_LptClients.insert(&socket);
+      std::scoped_lock lock(m_Impl->lptClientMutex);
+      m_Impl->lptClients.insert(&socket);
       if (m_Log) {
         m_Log->information("[BrakeTesterHttpServer Info]: /api/lpt client connected. total=" +
-                           std::to_string(m_LptClients.size()));
+                           std::to_string(m_Impl->lptClients.size()));
       }
     }
 
     std::string message;
-    while (m_IsRunning.load() && socket.read(message) != httplib::ws::Fail) {
+    while (m_Impl->isRunning.load() && socket.read(message) != httplib::ws::Fail) {
     }
 
     {
-      std::scoped_lock lock(m_LptClientMutex);
-      m_LptClients.erase(&socket);
+      std::scoped_lock lock(m_Impl->lptClientMutex);
+      m_Impl->lptClients.erase(&socket);
       if (m_Log) {
         m_Log->information("[BrakeTesterHttpServer Info]: /api/lpt client disconnected. total=" +
-                           std::to_string(m_LptClients.size()));
+                           std::to_string(m_Impl->lptClients.size()));
       }
     }
   });
 }
 
 void BrakeTesterHttpServer::startLptBroadcastLoop() {
-  m_LptBroadcastThread = std::thread([this] {
+  m_Impl->lptBroadcastThread = std::thread([this] {
     if (m_Log) {
       m_Log->information("[BrakeTesterHttpServer Info]: LPT broadcast thread started.");
     }
@@ -213,7 +237,7 @@ void BrakeTesterHttpServer::startLptBroadcastLoop() {
       }
     };
 
-    while (m_IsRunning.load()) {
+    while (m_Impl->isRunning.load()) {
       LptProcessStatus status = LptProcessStatus::Idle;
       std::uint64_t version = lastSeenVersion;
 
@@ -235,12 +259,12 @@ void BrakeTesterHttpServer::startLptBroadcastLoop() {
       nlohmann::json payload{{"event", lptEventNameForStatus(status)}};
       const auto payloadText = payload.dump();
 
-      std::scoped_lock lock(m_LptClientMutex);
+      std::scoped_lock lock(m_Impl->lptClientMutex);
       if (m_Log) {
         m_Log->information("[BrakeTesterHttpServer Info]: Broadcasting LPT event to " +
-                           std::to_string(m_LptClients.size()) + " client(s): " + payloadText);
+                           std::to_string(m_Impl->lptClients.size()) + " client(s): " + payloadText);
       }
-      for (auto* socket : m_LptClients) {
+      for (auto* socket : m_Impl->lptClients) {
         if (socket != nullptr) {
           socket->send(payloadText);
         }
@@ -260,16 +284,16 @@ void BrakeTesterHttpServer::configureVehicleModule() {
     m_Log->information("[BrakeTesterHttpServer Info]: Configuring vehicle websocket module at /api/vehicles.");
   }
 
-  m_Server->WebSocket("/api/vehicles", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
+  m_Impl->server->WebSocket("/api/vehicles", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
     {
-      std::scoped_lock lock(m_VehicleClientMutex);
-      m_VehicleClients.insert(&socket);
+      std::scoped_lock lock(m_Impl->vehicleClientMutex);
+      m_Impl->vehicleClients.insert(&socket);
     }
 
-    socket.send(buildVehicleStatePayload().dump());
+    socket.send(buildVehicleStatePayloadText());
 
     std::string message;
-    while (m_IsRunning.load() && socket.read(message) != httplib::ws::Fail) {
+    while (m_Impl->isRunning.load() && socket.read(message) != httplib::ws::Fail) {
       try {
         const auto payload = nlohmann::json::parse(message);
         const std::string action = payload.value("action", "");
@@ -384,8 +408,8 @@ void BrakeTesterHttpServer::configureVehicleModule() {
     }
 
     {
-      std::scoped_lock lock(m_VehicleClientMutex);
-      m_VehicleClients.erase(&socket);
+      std::scoped_lock lock(m_Impl->vehicleClientMutex);
+      m_Impl->vehicleClients.erase(&socket);
     }
   });
 }
@@ -395,16 +419,16 @@ void BrakeTesterHttpServer::configureSettingsModule() {
     m_Log->information("[BrakeTesterHttpServer Info]: Configuring settings websocket module at /api/settings.");
   }
 
-  m_Server->WebSocket("/api/settings", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
+  m_Impl->server->WebSocket("/api/settings", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
     {
-      std::scoped_lock lock(m_SettingsClientMutex);
-      m_SettingsClients.insert(&socket);
+      std::scoped_lock lock(m_Impl->settingsClientMutex);
+      m_Impl->settingsClients.insert(&socket);
     }
 
-    socket.send(buildSettingsStatePayload().dump());
+    socket.send(buildSettingsStatePayloadText());
 
     std::string message;
-    while (m_IsRunning.load() && socket.read(message) != httplib::ws::Fail) {
+    while (m_Impl->isRunning.load() && socket.read(message) != httplib::ws::Fail) {
       try {
         const auto payload = nlohmann::json::parse(message);
         const std::string action = payload.value("action", "");
@@ -457,8 +481,8 @@ void BrakeTesterHttpServer::configureSettingsModule() {
     }
 
     {
-      std::scoped_lock lock(m_SettingsClientMutex);
-      m_SettingsClients.erase(&socket);
+      std::scoped_lock lock(m_Impl->settingsClientMutex);
+      m_Impl->settingsClients.erase(&socket);
     }
   });
 }
@@ -468,21 +492,21 @@ void BrakeTesterHttpServer::configureStatusModule() {
     m_Log->information("[BrakeTesterHttpServer Info]: Configuring status websocket module at /api/status.");
   }
 
-  m_Server->WebSocket("/api/status", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
+  m_Impl->server->WebSocket("/api/status", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
     {
-      std::scoped_lock lock(m_StatusClientMutex);
-      m_StatusClients.insert(&socket);
+      std::scoped_lock lock(m_Impl->statusClientMutex);
+      m_Impl->statusClients.insert(&socket);
     }
 
     socket.send(nlohmann::json{{"event", "status.update"}, {"status", {{"level", "idle"}, {"text", "Idle"}}}}.dump());
 
     std::string message;
-    while (m_IsRunning.load() && socket.read(message) != httplib::ws::Fail) {
+    while (m_Impl->isRunning.load() && socket.read(message) != httplib::ws::Fail) {
     }
 
     {
-      std::scoped_lock lock(m_StatusClientMutex);
-      m_StatusClients.erase(&socket);
+      std::scoped_lock lock(m_Impl->statusClientMutex);
+      m_Impl->statusClients.erase(&socket);
     }
   });
 }
@@ -494,8 +518,8 @@ void BrakeTesterHttpServer::broadcastStatus(const std::string& level, const std:
   };
 
   const std::string payloadText = payload.dump();
-  std::scoped_lock lock(m_StatusClientMutex);
-  for (auto* socket : m_StatusClients) {
+  std::scoped_lock lock(m_Impl->statusClientMutex);
+  for (auto* socket : m_Impl->statusClients) {
     if (socket != nullptr) {
       socket->send(payloadText);
     }
@@ -503,13 +527,13 @@ void BrakeTesterHttpServer::broadcastStatus(const std::string& level, const std:
 }
 
 void BrakeTesterHttpServer::startSettingsBroadcastLoop() {
-  m_SettingsBroadcastThread = std::thread([this] {
+  m_Impl->settingsBroadcastThread = std::thread([this] {
     if (m_Log) {
       m_Log->information("[BrakeTesterHttpServer Info]: Settings broadcast thread started.");
     }
     std::uint64_t lastSeenVersion = m_SerialDeviceStore.getVersion();
 
-    while (m_IsRunning.load()) {
+    while (m_Impl->isRunning.load()) {
       std::vector<std::string> devices;
       std::uint64_t version = lastSeenVersion;
       if (!m_SerialDeviceStore.waitForVersionAfter(lastSeenVersion, std::chrono::milliseconds(250), devices, version)) {
@@ -525,7 +549,7 @@ void BrakeTesterHttpServer::startSettingsBroadcastLoop() {
   });
 }
 
-nlohmann::json BrakeTesterHttpServer::buildSettingsStatePayload() const {
+std::string BrakeTesterHttpServer::buildSettingsStatePayloadText() const {
   const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
   const auto devices = m_SerialDeviceStore.getDevices();
 
@@ -534,25 +558,26 @@ nlohmann::json BrakeTesterHttpServer::buildSettingsStatePayload() const {
     deviceItems.push_back(device);
   }
 
-  return {
+  const nlohmann::json payload = {
       {"event", "settings.state"},
       {"serialDevices", deviceItems},
       {"lptDevicePath", serialSettings.lptDevicePath},
       {"brakeTesterDevicePath", serialSettings.brakeTesterDevicePath},
   };
+  return payload.dump();
 }
 
 void BrakeTesterHttpServer::broadcastSettingsState() {
-  const std::string payload = buildSettingsStatePayload().dump();
-  std::scoped_lock lock(m_SettingsClientMutex);
-  for (auto* socket : m_SettingsClients) {
+  const std::string payload = buildSettingsStatePayloadText();
+  std::scoped_lock lock(m_Impl->settingsClientMutex);
+  for (auto* socket : m_Impl->settingsClients) {
     if (socket != nullptr) {
       socket->send(payload);
     }
   }
 }
 
-nlohmann::json BrakeTesterHttpServer::buildVehicleStatePayload() const {
+std::string BrakeTesterHttpServer::buildVehicleStatePayloadText() const {
   const auto vehicles = m_VehicleRepository.getVehicles();
   const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
 
@@ -577,17 +602,18 @@ nlohmann::json BrakeTesterHttpServer::buildVehicleStatePayload() const {
   const nlohmann::json selectedVehicleId = selectedVehicle.id > 0 ? nlohmann::json(selectedVehicle.id)
                                                                  : nlohmann::json(nullptr);
 
-  return {
+  const nlohmann::json payload = {
       {"event", "vehicles.state"},
       {"vehicles", vehicleItems},
       {"selectedVehicleId", selectedVehicleId},
   };
+  return payload.dump();
 }
 
 void BrakeTesterHttpServer::broadcastVehicleState() {
-  const std::string payload = buildVehicleStatePayload().dump();
-  std::scoped_lock lock(m_VehicleClientMutex);
-  for (auto* socket : m_VehicleClients) {
+  const std::string payload = buildVehicleStatePayloadText();
+  std::scoped_lock lock(m_Impl->vehicleClientMutex);
+  for (auto* socket : m_Impl->vehicleClients) {
     if (socket != nullptr) {
       socket->send(payload);
     }
