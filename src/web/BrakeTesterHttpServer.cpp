@@ -113,10 +113,10 @@ void BrakeTesterHttpServer::stop() {
     }
   };
 
-  closeSockets("/lpt", m_LptClientMutex, m_LptClients);
-  closeSockets("/vehicles", m_VehicleClientMutex, m_VehicleClients);
-  closeSockets("/status", m_StatusClientMutex, m_StatusClients);
-  closeSockets("/settings", m_SettingsClientMutex, m_SettingsClients);
+  closeSockets("/api/lpt", m_LptClientMutex, m_LptClients);
+  closeSockets("/api/vehicles", m_VehicleClientMutex, m_VehicleClients);
+  closeSockets("/api/status", m_StatusClientMutex, m_StatusClients);
+  closeSockets("/api/settings", m_SettingsClientMutex, m_SettingsClients);
 
   if (m_LptBroadcastThread.joinable()) {
     if (m_Log) {
@@ -156,14 +156,14 @@ void BrakeTesterHttpServer::stop() {
 
 void BrakeTesterHttpServer::configureLptModule() {
   if (m_Log) {
-    m_Log->information("[BrakeTesterHttpServer Info]: Configuring LPT websocket module at /lpt.");
+    m_Log->information("[BrakeTesterHttpServer Info]: Configuring LPT websocket module at /api/lpt.");
   }
-  m_Server->WebSocket("/lpt", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
+  m_Server->WebSocket("/api/lpt", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
     {
       std::scoped_lock lock(m_LptClientMutex);
       m_LptClients.insert(&socket);
       if (m_Log) {
-        m_Log->information("[BrakeTesterHttpServer Info]: /lpt client connected. total=" +
+        m_Log->information("[BrakeTesterHttpServer Info]: /api/lpt client connected. total=" +
                            std::to_string(m_LptClients.size()));
       }
     }
@@ -176,7 +176,7 @@ void BrakeTesterHttpServer::configureLptModule() {
       std::scoped_lock lock(m_LptClientMutex);
       m_LptClients.erase(&socket);
       if (m_Log) {
-        m_Log->information("[BrakeTesterHttpServer Info]: /lpt client disconnected. total=" +
+        m_Log->information("[BrakeTesterHttpServer Info]: /api/lpt client disconnected. total=" +
                            std::to_string(m_LptClients.size()));
       }
     }
@@ -257,10 +257,10 @@ void BrakeTesterHttpServer::startLptBroadcastLoop() {
 
 void BrakeTesterHttpServer::configureVehicleModule() {
   if (m_Log) {
-    m_Log->information("[BrakeTesterHttpServer Info]: Configuring vehicle websocket module at /vehicles.");
+    m_Log->information("[BrakeTesterHttpServer Info]: Configuring vehicle websocket module at /api/vehicles.");
   }
 
-  m_Server->WebSocket("/vehicles", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
+  m_Server->WebSocket("/api/vehicles", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
     {
       std::scoped_lock lock(m_VehicleClientMutex);
       m_VehicleClients.insert(&socket);
@@ -378,7 +378,7 @@ void BrakeTesterHttpServer::configureVehicleModule() {
         }
       } catch (const std::exception& ex) {
         if (m_Log) {
-          m_Log->warning(std::string("[BrakeTesterHttpServer Warning]: Invalid /vehicles message: ") + ex.what());
+          m_Log->warning(std::string("[BrakeTesterHttpServer Warning]: Invalid /api/vehicles message: ") + ex.what());
         }
       }
     }
@@ -392,10 +392,10 @@ void BrakeTesterHttpServer::configureVehicleModule() {
 
 void BrakeTesterHttpServer::configureSettingsModule() {
   if (m_Log) {
-    m_Log->information("[BrakeTesterHttpServer Info]: Configuring settings websocket module at /settings.");
+    m_Log->information("[BrakeTesterHttpServer Info]: Configuring settings websocket module at /api/settings.");
   }
 
-  m_Server->WebSocket("/settings", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
+  m_Server->WebSocket("/api/settings", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
     {
       std::scoped_lock lock(m_SettingsClientMutex);
       m_SettingsClients.insert(&socket);
@@ -451,7 +451,7 @@ void BrakeTesterHttpServer::configureSettingsModule() {
         }
       } catch (const std::exception& ex) {
         if (m_Log) {
-          m_Log->warning(std::string("[BrakeTesterHttpServer Warning]: Invalid /settings message: ") + ex.what());
+          m_Log->warning(std::string("[BrakeTesterHttpServer Warning]: Invalid /api/settings message: ") + ex.what());
         }
       }
     }
@@ -465,10 +465,10 @@ void BrakeTesterHttpServer::configureSettingsModule() {
 
 void BrakeTesterHttpServer::configureStatusModule() {
   if (m_Log) {
-    m_Log->information("[BrakeTesterHttpServer Info]: Configuring status websocket module at /status.");
+    m_Log->information("[BrakeTesterHttpServer Info]: Configuring status websocket module at /api/status.");
   }
 
-  m_Server->WebSocket("/status", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
+  m_Server->WebSocket("/api/status", [this](const httplib::Request&, httplib::ws::WebSocket& socket) {
     {
       std::scoped_lock lock(m_StatusClientMutex);
       m_StatusClients.insert(&socket);
