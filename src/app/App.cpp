@@ -3,23 +3,13 @@
 #include <chrono>
 #include <algorithm>
 #include <filesystem>
-#include <cstdio>
 #include <ctime>
 #include <iomanip>
-#include <iostream>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <thread>
 #include <vector>
-
-#if defined(_WIN32)
-#include <conio.h>
-#include <io.h>
-#else
-#include <sys/select.h>
-#include <unistd.h>
-#endif
 
 #include "brake_tester/components.hpp"
 #include "brake_tester/lpt_manager.hpp"
@@ -66,21 +56,6 @@ std::string formatMileageForPrn(const std::optional<std::string>& mileage) {
   }
 
   return formattedMileage;
-}
-
-bool hasConsoleInputAvailable() {
-#if defined(_WIN32)
-  return _kbhit() != 0;
-#else
-  fd_set readSet;
-  FD_ZERO(&readSet);
-  FD_SET(STDIN_FILENO, &readSet);
-  timeval timeout{};
-  timeout.tv_sec = 0;
-  timeout.tv_usec = 0;
-  const int selectResult = select(STDIN_FILENO + 1, &readSet, nullptr, nullptr, &timeout);
-  return selectResult > 0 && FD_ISSET(STDIN_FILENO, &readSet);
-#endif
 }
 
 std::vector<std::string> scanSerialDevices() {
@@ -210,82 +185,60 @@ void App::run() {
   m_LptManager->start();
   m_HttpServer->start();
   startSerialDeviceRefreshLoop();
-  startInputListener();
+  if (m_Log) {
+    m_Log->information("[App Info]: Runtime modules started.");
+  }
 }
 
 void App::shutdown() {
-  m_IsInputListening = false;
   if (m_Log) {
-    m_Log->information("[App Info]: Shutting down runtime modules.");
-  }
-
-  if (m_InputThread.joinable()) {
-    m_InputThread.join();
+    m_Log->information("[App Info]: Shutdown requested. Beginning staged shutdown.");
   }
 
   if (m_HttpServer) {
+    if (m_Log) {
+      m_Log->information("[App Info]: Stopping HTTP server module.");
+    }
     m_HttpServer->stop();
+    if (m_Log) {
+      m_Log->information("[App Info]: HTTP server module stopped.");
+    }
   }
 
   m_IsSerialDeviceRefreshRunning = false;
   if (m_SerialDeviceRefreshThread.joinable()) {
+    if (m_Log) {
+      m_Log->information("[App Info]: Waiting for serial device refresh thread to exit.");
+    }
     m_SerialDeviceRefreshThread.join();
+    if (m_Log) {
+      m_Log->information("[App Info]: Serial device refresh thread exited.");
+    }
   }
 
   if (m_LptManager) {
+    if (m_Log) {
+      m_Log->information("[App Info]: Stopping LPT manager module.");
+    }
     m_LptManager->stop();
+    if (m_Log) {
+      m_Log->information("[App Info]: LPT manager module stopped.");
+    }
   }
 
   if (m_DatabaseHandle != nullptr) {
+    if (m_Log) {
+      m_Log->information("[App Info]: Closing sqlite database handle.");
+    }
     sqlite3_close(m_DatabaseHandle);
     m_DatabaseHandle = nullptr;
     if (m_Log) {
       m_Log->information("[App Info]: Closed sqlite database handle.");
     }
   }
-}
-
-void App::startInputListener() {
-  if (m_IsInputListening.exchange(true)) {
-    return;
+  if (m_Log) {
+    m_Log->information("[App Info]: Shutdown completed.");
   }
-
-  const bool isInteractiveConsole =
-#if defined(_WIN32)
-      _isatty(_fileno(stdin)) != 0;
-#else
-      isatty(fileno(stdin)) != 0;
-#endif
-
-  if (!isInteractiveConsole) {
-    m_IsInputListening = false;
-    if (m_Log) {
-      m_Log->information("[App Info]: Input listener disabled (stdin is not an interactive terminal).");
-    }
-    return;
-  }
-
-  m_InputThread = std::thread([this]() {
-    if (m_Log) {
-      m_Log->information("[App Info]: Input listener active. Type 't' and press Enter for test signal.");
-    }
-    std::string consoleInput;
-    while (m_IsInputListening) {
-      if (!hasConsoleInputAvailable()) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        continue;
-      }
-
-      if (!std::getline(std::cin, consoleInput)) {
-        std::cin.clear();
-        continue;
-      }
-
-      if (consoleInput == "t") {
-        m_LptManager->sendTestSignal(true);
-      }
-    }
-  });
 }
 
 void App::startSerialDeviceRefreshLoop() {
@@ -293,7 +246,13 @@ void App::startSerialDeviceRefreshLoop() {
     return;
   }
 
+  if (m_Log) {
+    m_Log->information("[App Info]: Starting serial device refresh thread.");
+  }
   m_SerialDeviceRefreshThread = std::thread([this]() {
+    if (m_Log) {
+      m_Log->information("[App Info]: Serial device refresh thread started.");
+    }
     while (m_IsSerialDeviceRefreshRunning) {
       try {
         m_SerialDeviceStore->setDevices(scanSerialDevices());
@@ -304,6 +263,9 @@ void App::startSerialDeviceRefreshLoop() {
       }
 
       std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    if (m_Log) {
+      m_Log->information("[App Info]: Serial device refresh thread stopping.");
     }
   });
 }
