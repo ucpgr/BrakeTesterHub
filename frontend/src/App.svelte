@@ -11,6 +11,10 @@
   <div class="mx-auto w-full max-w-7xl px-1 py-2 sm:px-2 sm:py-3 md:px-4 md:py-4 lg:px-6 lg:py-6 space-y-6">
   {#if $currentRoute === '/'}
     <h1>Live</h1>
+    <div class="grid md:grid-cols-[300px_1fr] gap-6">
+      <TelemetryCard />
+      <AxleResultsCard />
+    </div>
   {:else if $currentRoute === '/settings'}
     <h1 class="text-foreground">Settings</h1>
     <CommunicationHardwareCard />
@@ -18,10 +22,6 @@
     <h1>History</h1>
   {:else}
     <h1>Home</h1>
-    <div class="grid md:grid-cols-[300px_1fr] gap-6">
-      <TelemetryCard />
-      <AxleResultsCard />
-    </div>
   {/if}
   </div>
 </div>
