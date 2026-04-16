@@ -80,18 +80,48 @@ void BrakeTesterHttpServer::stop() {
   }
 
   if (m_Server) {
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: Calling httplib::Server::stop().");
+    }
     m_Server->stop();
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: httplib::Server::stop() returned.");
+    }
   }
 
   if (m_LptBroadcastThread.joinable()) {
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: Waiting for LPT broadcast thread to join.");
+    }
     m_LptBroadcastThread.join();
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: LPT broadcast thread joined.");
+    }
   }
   if (m_SettingsBroadcastThread.joinable()) {
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: Waiting for settings broadcast thread to join.");
+    }
     m_SettingsBroadcastThread.join();
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: Settings broadcast thread joined.");
+    }
   }
 
   if (m_ServerThread.joinable()) {
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: Waiting for HTTP server listener thread to join.");
+    }
     m_ServerThread.join();
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: HTTP server listener thread joined.");
+    }
+  } else if (m_Log) {
+    m_Log->information("[BrakeTesterHttpServer Info]: HTTP server listener thread was not joinable during stop.");
+  }
+
+  if (m_Log) {
+    m_Log->information("[BrakeTesterHttpServer Info]: Stop sequence completed.");
   }
 }
 
@@ -126,6 +156,9 @@ void BrakeTesterHttpServer::configureLptModule() {
 
 void BrakeTesterHttpServer::startLptBroadcastLoop() {
   m_LptBroadcastThread = std::thread([this] {
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: LPT broadcast thread started.");
+    }
     std::uint64_t lastSeenVersion = m_LptStore.getProcessStatusVersion();
     LptProcessStatus lastBroadcastStatus = LptProcessStatus::Idle;
     auto lastStatusBroadcastAt = std::chrono::steady_clock::now();
@@ -186,6 +219,9 @@ void BrakeTesterHttpServer::startLptBroadcastLoop() {
 
       broadcastTopBarStatus(status);
       lastStatusBroadcastAt = std::chrono::steady_clock::now();
+    }
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: LPT broadcast thread stopping.");
     }
   });
 }
@@ -439,6 +475,9 @@ void BrakeTesterHttpServer::broadcastStatus(const std::string& level, const std:
 
 void BrakeTesterHttpServer::startSettingsBroadcastLoop() {
   m_SettingsBroadcastThread = std::thread([this] {
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: Settings broadcast thread started.");
+    }
     std::uint64_t lastSeenVersion = m_SerialDeviceStore.getVersion();
 
     while (m_IsRunning.load()) {
@@ -450,6 +489,9 @@ void BrakeTesterHttpServer::startSettingsBroadcastLoop() {
 
       lastSeenVersion = version;
       broadcastSettingsState();
+    }
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: Settings broadcast thread stopping.");
     }
   });
 }
