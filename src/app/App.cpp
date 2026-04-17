@@ -13,6 +13,7 @@
 
 #include "brake_tester/components.hpp"
 #include "brake_tester/lpt_manager.hpp"
+#include "brake_tester/print_manager.hpp"
 #include "brake_tester/repositories.hpp"
 #include "brake_tester/stores/SerialDeviceStore.hpp"
 #include "brake_tester/web/BrakeTesterHttpServer.hpp"
@@ -100,10 +101,12 @@ App::App(std::string databasePath) {
 
   m_SettingsRepository = std::make_unique<SettingsRepository>(m_DatabaseHandle, m_Log);
   m_VehicleRepository = std::make_unique<VehicleRepository>(m_DatabaseHandle, m_Log);
+  m_PrintSettingsRepository = std::make_unique<PrintSettingsRepository>(m_DatabaseHandle, m_Log);
   m_LptRepository = std::make_unique<LptRepository>(m_DatabaseHandle, m_Log);
   m_SelectedVehicleStore = std::make_unique<SelectedVehicleStore>();
   m_LptStore = std::make_unique<LptStore>();
   m_SerialDeviceStore = std::make_unique<SerialDeviceStore>();
+  m_PrintStatusStore = std::make_unique<PrintStatusStore>();
 
   auto listener = std::make_unique<LptListener>(*m_SettingsRepository, *m_LptStore, m_Log);
   auto patcher = std::make_unique<PrnPatcher>(*m_SelectedVehicleStore, m_Log);
@@ -160,13 +163,22 @@ App::App(std::string databasePath) {
                                               *m_SettingsRepository,
                                               m_Log);
 
+  CupsPrinterClient cupsPrinterClient(m_Log);
+  m_PrintManager = std::make_unique<PrintManager>(std::move(cupsPrinterClient),
+                                                  *m_PrintSettingsRepository,
+                                                  *m_PrintStatusStore,
+                                                  m_Log);
+
   m_HttpServer = std::make_unique<BrakeTesterHttpServer>(
       *m_LptStore,
       *m_SettingsRepository,
+      *m_PrintSettingsRepository,
       *m_SerialDeviceStore,
+      *m_PrintStatusStore,
       *m_VehicleRepository,
       *m_SelectedVehicleStore,
       *m_LptManager,
+      *m_PrintManager,
       m_Log,
       "0.0.0.0",
       80,
@@ -183,6 +195,7 @@ void App::run() {
     m_Log->information("[App Info]: Starting runtime modules.");
   }
   m_LptManager->start();
+  m_PrintManager->start();
   m_HttpServer->start();
   startSerialDeviceRefreshLoop();
   if (m_Log) {
@@ -213,6 +226,16 @@ void App::shutdown() {
     m_SerialDeviceRefreshThread.join();
     if (m_Log) {
       m_Log->information("[App Info]: Serial device refresh thread exited.");
+    }
+  }
+
+  if (m_PrintManager) {
+    if (m_Log) {
+      m_Log->information("[App Info]: Stopping print manager module.");
+    }
+    m_PrintManager->stop();
+    if (m_Log) {
+      m_Log->information("[App Info]: Print manager module stopped.");
     }
   }
 

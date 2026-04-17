@@ -8,15 +8,19 @@
 namespace brake_tester {
 
 class LptManager;
+class PrintManager;
 
 class BrakeTesterHttpServer {
 public:
   BrakeTesterHttpServer(ILptStore& lptStore,
                         ISettingsRepository& settingsRepository,
+                        IPrintSettingsRepository& printSettingsRepository,
                         ISerialDeviceStore& serialDeviceStore,
+                        IPrintStatusStore& printStatusStore,
                         IVehicleRepository& vehicleRepository,
                         ISelectedVehicleStore& selectedVehicleStore,
                         LptManager& lptManager,
+                        PrintManager& printManager,
                         SharedLogger log,
                         std::string host = "0.0.0.0",
                         int port = 80,
@@ -35,6 +39,7 @@ private:
   void configureSettingsModule();
   void startLptBroadcastLoop();
   void startSettingsBroadcastLoop();
+  void startPrintStatusBroadcastLoop();
   void broadcastVehicleState();
   void broadcastSettingsState();
   std::string buildVehicleStatePayloadText() const;
@@ -44,10 +49,13 @@ private:
 
   ILptStore& m_LptStore;
   ISettingsRepository& m_SettingsRepository;
+  IPrintSettingsRepository& m_PrintSettingsRepository;
   ISerialDeviceStore& m_SerialDeviceStore;
+  IPrintStatusStore& m_PrintStatusStore;
   IVehicleRepository& m_VehicleRepository;
   ISelectedVehicleStore& m_SelectedVehicleStore;
   LptManager& m_LptManager;
+  PrintManager& m_PrintManager;
   SharedLogger m_Log;
   std::string m_Host;
   int m_Port;

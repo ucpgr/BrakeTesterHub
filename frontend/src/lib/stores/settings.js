@@ -4,6 +4,11 @@ export const serialDevices = writable([]);
 export const lptDevicePath = writable('');
 export const brakeTesterDevicePath = writable('');
 
+export const printers = writable([]);
+export const selectedPrinter = writable('');
+export const autoPrint = writable(false);
+export const printStatus = writable('Idle');
+
 let settingsSocket = null;
 
 export const availableUnassignedDevices = derived(
@@ -33,9 +38,17 @@ export function connectSettingsSocket() {
             serialDevices.set(Array.isArray(payload.serialDevices) ? payload.serialDevices : []);
             lptDevicePath.set(payload.lptDevicePath ?? '');
             brakeTesterDevicePath.set(payload.brakeTesterDevicePath ?? '');
+            printers.set(Array.isArray(payload.printers) ? payload.printers : []);
+            selectedPrinter.set(payload.selectedPrinter ?? '');
+            autoPrint.set(Boolean(payload.autoPrint));
+            printStatus.set(payload.printStatus ?? 'Idle');
         } catch (error) {
             console.warn('Failed to parse /api/settings message', error);
         }
+    };
+
+    settingsSocket.onopen = () => {
+        refreshPrinters();
     };
 
     settingsSocket.onclose = () => {
@@ -76,4 +89,16 @@ export function runLptTest1() {
 
 export function runLptTest2() {
     sendSettingsMessage({ action: 'test_lpt', setTestEnabled: false });
+}
+
+export function selectPrinter(printerName) {
+    sendSettingsMessage({ action: 'select_printer', printerName: printerName ?? '' });
+}
+
+export function setAutoPrint(enabled) {
+    sendSettingsMessage({ action: 'set_auto_print', enabled: Boolean(enabled) });
+}
+
+export function refreshPrinters() {
+    sendSettingsMessage({ action: 'refresh_printers' });
 }

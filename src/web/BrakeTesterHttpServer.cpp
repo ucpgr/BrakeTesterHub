@@ -15,20 +15,26 @@ namespace brake_tester {
 
 BrakeTesterHttpServer::BrakeTesterHttpServer(ILptStore& lptStore,
                                              ISettingsRepository& settingsRepository,
+                                             IPrintSettingsRepository& printSettingsRepository,
                                              ISerialDeviceStore& serialDeviceStore,
+                                             IPrintStatusStore& printStatusStore,
                                              IVehicleRepository& vehicleRepository,
                                              ISelectedVehicleStore& selectedVehicleStore,
                                              LptManager& lptManager,
+                                             PrintManager& printManager,
                                              SharedLogger log,
                                              std::string host,
                                              int port,
                                              std::string staticRoot)
     : m_LptStore(lptStore),
       m_SettingsRepository(settingsRepository),
+      m_PrintSettingsRepository(printSettingsRepository),
       m_SerialDeviceStore(serialDeviceStore),
+      m_PrintStatusStore(printStatusStore),
       m_VehicleRepository(vehicleRepository),
       m_SelectedVehicleStore(selectedVehicleStore),
       m_LptManager(lptManager),
+      m_PrintManager(printManager),
       m_Log(std::move(log)),
       m_Host(std::move(host)),
       m_Port(port),
@@ -62,6 +68,7 @@ void BrakeTesterHttpServer::start() {
   configureSettingsModule();
   startLptBroadcastLoop();
   startSettingsBroadcastLoop();
+  startPrintStatusBroadcastLoop();
 
   m_Impl->serverThread = std::thread([this] {
     if (m_Log) {
@@ -137,6 +144,16 @@ void BrakeTesterHttpServer::stop() {
     m_Impl->settingsBroadcastThread.join();
     if (m_Log) {
       m_Log->information("[BrakeTesterHttpServer Info]: Settings broadcast thread joined.");
+    }
+  }
+
+  if (m_Impl->printStatusBroadcastThread.joinable()) {
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: Waiting for print status broadcast thread to join.");
+    }
+    m_Impl->printStatusBroadcastThread.join();
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: Print status broadcast thread joined.");
     }
   }
 

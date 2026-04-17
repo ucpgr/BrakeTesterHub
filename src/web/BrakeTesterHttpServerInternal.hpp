@@ -19,6 +19,7 @@ struct BrakeTesterHttpServer::Impl {
 
   std::thread lptBroadcastThread;
   std::thread settingsBroadcastThread;
+  std::thread printStatusBroadcastThread;
   std::mutex lptClientMutex;
   std::unordered_set<httplib::ws::WebSocket*> lptClients;
 
