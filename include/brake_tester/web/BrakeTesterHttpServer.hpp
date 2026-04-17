@@ -13,6 +13,7 @@ class PrintManager;
 class BrakeTesterHttpServer {
 public:
   BrakeTesterHttpServer(ILptStore& lptStore,
+                        ILptRepository& lptRepository,
                         ISettingsRepository& settingsRepository,
                         IPrintSettingsRepository& printSettingsRepository,
                         ISerialDeviceStore& serialDeviceStore,
@@ -37,6 +38,7 @@ private:
   void configureVehicleModule();
   void configureStatusModule();
   void configureSettingsModule();
+  void configureHistoryModule();
   void startLptBroadcastLoop();
   void startSettingsBroadcastLoop();
   void startPrintStatusBroadcastLoop();
@@ -48,6 +50,7 @@ private:
   void broadcastStatus(const std::string& level, const std::string& text);
 
   ILptStore& m_LptStore;
+  ILptRepository& m_LptRepository;
   ISettingsRepository& m_SettingsRepository;
   IPrintSettingsRepository& m_PrintSettingsRepository;
   ISerialDeviceStore& m_SerialDeviceStore;

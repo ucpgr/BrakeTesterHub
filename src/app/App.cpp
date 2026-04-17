@@ -159,6 +159,8 @@ App::App(std::string databasePath) {
                                               std::move(patcher),
                                               std::move(renderer),
                                               std::move(prnWriter),
+                                              *m_LptRepository,
+                                              *m_SelectedVehicleStore,
                                               *m_LptStore,
                                               *m_SettingsRepository,
                                               m_Log);
@@ -171,6 +173,7 @@ App::App(std::string databasePath) {
 
   m_HttpServer = std::make_unique<BrakeTesterHttpServer>(
       *m_LptStore,
+      *m_LptRepository,
       *m_SettingsRepository,
       *m_PrintSettingsRepository,
       *m_SerialDeviceStore,
