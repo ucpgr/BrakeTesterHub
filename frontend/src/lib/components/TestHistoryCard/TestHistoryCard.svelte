@@ -21,6 +21,7 @@
 
   let modalOpen = false;
   let modalLoading = false;
+  let selectedTestSummary = null;
   let selectedTestDetails = null;
 
   function formatDateTime(utcText) {
@@ -88,13 +89,14 @@
     }
   }
 
-  async function openDetails(testId) {
+  async function openDetails(test) {
     modalOpen = true;
     modalLoading = true;
+    selectedTestSummary = test ?? null;
     selectedTestDetails = null;
 
     try {
-      const response = await fetch(`/api/history/${testId}`);
+      const response = await fetch(`/api/history/${test.id}`);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -110,6 +112,7 @@
 
   function closeModal() {
     modalOpen = false;
+    selectedTestSummary = null;
     selectedTestDetails = null;
   }
 
@@ -134,6 +137,24 @@
   function resetPageAndLoad() {
     currentPage = 1;
     loadHistory();
+  }
+
+  function pdfHrefForTest(test) {
+    const testId = test?.id;
+    return testId ? `/api/history/${testId}/pdf` : '';
+  }
+
+  function handleModalBackdropKeydown(event) {
+    if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      closeModal();
+    }
+  }
+
+  function handleBackdropClick(event) {
+    if (event.target === event.currentTarget) {
+      closeModal();
+    }
   }
 
   onMount(async () => {
@@ -198,7 +219,7 @@
     {:else}
       <div class="space-y-2">
         {#each tests as test}
-          <button type="button" class="flex w-full items-center gap-3 rounded-md border border-border bg-background p-3 text-left hover:bg-muted/40" on:click={() => openDetails(test.id)}>
+          <button type="button" class="flex w-full items-center gap-3 rounded-md border border-border bg-background p-3 text-left hover:bg-muted/40" on:click={() => openDetails(test)}>
             <div class="h-[100px] w-[100px] shrink-0 rounded border border-border bg-white"></div>
             <div class="min-w-0 flex-1 space-y-1">
               <div class="text-sm font-semibold {test.vehicle?.reg ? 'text-foreground' : 'text-muted-foreground'}">{test.vehicle?.reg || 'NA'}</div>
@@ -233,19 +254,25 @@
 </Card>
 
 {#if modalOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" on:click={closeModal}>
-    <div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-4" on:click|stopPropagation>
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    role="button"
+    tabindex="0"
+    aria-label="Close modal backdrop"
+    on:click={handleBackdropClick}
+    on:keydown={handleModalBackdropKeydown}
+  >
+    <div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-4" role="dialog" aria-modal="true">
       {#if modalLoading}
         <div class="text-sm text-muted-foreground">Loading test details…</div>
       {:else if !selectedTestDetails}
         <div class="space-y-4">
           <div class="text-sm text-red-500">Failed to load test details.</div>
-          <button type="button" class="rounded border border-border px-3 py-1" on:click={closeModal}>Close</button>
         </div>
       {:else}
         <div class="mb-4">
-          <h2 class="text-lg font-semibold">{selectedTestDetails.test?.vehicle?.reg || 'NA'}</h2>
-          <p class="text-sm text-muted-foreground">{formatDateTime(selectedTestDetails.test?.createdAtUtc)}</p>
+          <h2 class="text-lg font-semibold">{selectedTestDetails.test?.vehicle?.reg || selectedTestSummary?.vehicle?.reg || 'NA'}</h2>
+          <p class="text-sm text-muted-foreground">{formatDateTime(selectedTestDetails.test?.createdAtUtc || selectedTestSummary?.createdAtUtc)}</p>
         </div>
 
         <div class="overflow-x-auto">
@@ -292,11 +319,23 @@
           </table>
         </div>
 
-        <div class="mt-4 flex items-center justify-between">
-          <a class="text-sm text-blue-500 underline" href={selectedTestDetails.pdfUrl} target="_blank" rel="noreferrer">Open PDF</a>
-          <button type="button" class="rounded border border-border px-3 py-1" on:click={closeModal}>Close</button>
-        </div>
       {/if}
+
+      <div class="mt-4 flex items-center justify-between border-t border-border pt-3">
+        {#if selectedTestSummary?.pdfFile && pdfHrefForTest(selectedTestSummary)}
+          <a
+            class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/40"
+            href={pdfHrefForTest(selectedTestSummary)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open PDF
+          </a>
+        {:else}
+          <button type="button" class="rounded border border-border px-3 py-1 text-sm text-muted-foreground disabled:opacity-60" disabled>Open PDF</button>
+        {/if}
+        <button type="button" class="rounded border border-border px-3 py-1 text-foreground hover:bg-muted/40" on:click={closeModal}>Close</button>
+      </div>
     </div>
   </div>
 {/if}
