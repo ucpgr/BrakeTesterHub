@@ -16,6 +16,12 @@ struct SerialSettings {
   std::size_t readChunkSize{256};
 };
 
+
+struct PrintSettings {
+  std::string selectedPrinter;
+  bool autoPrint{false};
+};
+
 struct VehicleSelection {
   int id{0};
   std::string reg;

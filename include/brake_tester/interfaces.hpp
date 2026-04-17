@@ -12,6 +12,13 @@
 
 namespace brake_tester {
 
+class IPrintSettingsRepository {
+public:
+  virtual ~IPrintSettingsRepository() = default;
+  virtual PrintSettings getPrintSettings() const = 0;
+  virtual void setPrintSettings(const PrintSettings& printSettings) = 0;
+};
+
 class ISettingsRepository {
 public:
   virtual ~ISettingsRepository() = default;
@@ -34,6 +41,18 @@ public:
 class ILptRepository {
 public:
   virtual ~ILptRepository() = default;
+};
+
+class IPrintStatusStore {
+public:
+  virtual ~IPrintStatusStore() = default;
+  virtual std::string getStatus() const = 0;
+  virtual void setStatus(std::string status) = 0;
+  virtual std::uint64_t getVersion() const = 0;
+  virtual bool waitForVersionAfter(std::uint64_t afterVersion,
+                                   std::chrono::milliseconds timeout,
+                                   std::string& status,
+                                   std::uint64_t& version) const = 0;
 };
 
 class ISelectedVehicleStore {

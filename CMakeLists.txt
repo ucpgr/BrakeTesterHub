@@ -8,6 +8,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(FetchContent)
 
 find_package(Threads REQUIRED)
+find_path(CUPS_INCLUDE_DIR cups/cups.h REQUIRED)
+find_library(CUPS_LIBRARY cups REQUIRED)
 
 FetchContent_Declare(
     json
@@ -63,6 +65,7 @@ target_include_directories(BrakeTesterHub PRIVATE
     ${sqlite_orm_SOURCE_DIR}/include
     ${libserial_SOURCE_DIR}/src
     ${sqlite3_SOURCE_DIR}
+    ${CUPS_INCLUDE_DIR}
 )
 
 target_link_libraries(BrakeTesterHub PRIVATE
@@ -70,6 +73,7 @@ target_link_libraries(BrakeTesterHub PRIVATE
     libserial_static
     nlohmann_json::nlohmann_json
     Threads::Threads
+    ${CUPS_LIBRARY}
 )
 
 target_compile_definitions(BrakeTesterHub PRIVATE

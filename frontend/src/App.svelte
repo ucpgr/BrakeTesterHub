@@ -4,6 +4,7 @@
   import TelemetryCard from '$lib/components/TelemetryCard/TelemetryCard.svelte';
   import AxleResultsCard from "$lib/components/AxleResultsCard/AxleResultsCard.svelte";
   import CommunicationHardwareCard from '$lib/components/CommunicationHardwareCard/CommunicationHardwareCard.svelte';
+  import PrintSettingsCard from '$lib/components/PrintSettingsCard/PrintSettingsCard.svelte';
 </script>
 
 <TopBar></TopBar>
@@ -17,7 +18,10 @@
     </div>
   {:else if $currentRoute === '/settings'}
     <h1 class="text-foreground">Settings</h1>
-    <CommunicationHardwareCard />
+    <div class="space-y-6">
+      <CommunicationHardwareCard />
+      <PrintSettingsCard />
+    </div>
   {:else if $currentRoute === '/history'}
     <h1>History</h1>
   {:else}

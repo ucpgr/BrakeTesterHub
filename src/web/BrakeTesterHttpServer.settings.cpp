@@ -1,6 +1,7 @@
 #include "brake_tester/web/BrakeTesterHttpServer.hpp"
 #include "web/BrakeTesterHttpServerInternal.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <string>
 #include <thread>
@@ -10,6 +11,7 @@
 #include <nlohmann/json.hpp>
 
 #include "brake_tester/lpt_manager.hpp"
+#include "brake_tester/print_manager.hpp"
 
 namespace brake_tester {
 
@@ -32,6 +34,7 @@ void BrakeTesterHttpServer::configureSettingsModule() {
         const auto payload = nlohmann::json::parse(message);
         const std::string action = payload.value("action", "");
         SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
+        PrintSettings printSettings = m_PrintSettingsRepository.getPrintSettings();
 
         if (action == "assign_lpt") {
           const std::string devicePath = payload.value("devicePath", "");
@@ -67,6 +70,29 @@ void BrakeTesterHttpServer::configureSettingsModule() {
             broadcastStatus("warning", "BrakeTester serial device cleared");
             broadcastSettingsState();
           }
+        } else if (action == "select_printer") {
+          printSettings.selectedPrinter = payload.value("printerName", "");
+          m_PrintSettingsRepository.setPrintSettings(printSettings);
+          if (m_Log) {
+            m_Log->information("[BrakeTesterHttpServer Info]: Selected printer updated to '" +
+                               printSettings.selectedPrinter + "'.");
+          }
+          broadcastStatus("info", printSettings.selectedPrinter.empty() ? "Printer cleared" : "Printer updated");
+          broadcastSettingsState();
+        } else if (action == "set_auto_print") {
+          printSettings.autoPrint = payload.value("enabled", false);
+          m_PrintSettingsRepository.setPrintSettings(printSettings);
+          if (m_Log) {
+            m_Log->information(std::string("[BrakeTesterHttpServer Info]: Auto print updated. enabled=") +
+                               (printSettings.autoPrint ? "true" : "false"));
+          }
+          broadcastStatus("info", std::string("Auto print ") + (printSettings.autoPrint ? "enabled" : "disabled"));
+          broadcastSettingsState();
+        } else if (action == "refresh_printers") {
+          if (m_Log) {
+            m_Log->information("[BrakeTesterHttpServer Info]: Printer refresh requested by frontend.");
+          }
+          broadcastSettingsState();
         } else if (action == "test_lpt") {
           const bool setTestEnabled = payload.value("setTestEnabled", false);
           m_LptManager.sendTestSignal(setTestEnabled);
@@ -109,13 +135,59 @@ void BrakeTesterHttpServer::startSettingsBroadcastLoop() {
   });
 }
 
+void BrakeTesterHttpServer::startPrintStatusBroadcastLoop() {
+  m_Impl->printStatusBroadcastThread = std::thread([this] {
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: Print status broadcast thread started.");
+    }
+
+    std::uint64_t lastSeenVersion = m_PrintStatusStore.getVersion();
+    while (m_Impl->isRunning.load()) {
+      std::string statusText;
+      std::uint64_t version = lastSeenVersion;
+      if (!m_PrintStatusStore.waitForVersionAfter(lastSeenVersion,
+                                                  std::chrono::milliseconds(250),
+                                                  statusText,
+                                                  version)) {
+        continue;
+      }
+
+      lastSeenVersion = version;
+      if (m_Log) {
+        m_Log->information("[BrakeTesterHttpServer Info]: Print status changed -> " + statusText);
+      }
+
+      if (statusText == "Print failed.") {
+        broadcastStatus("error", statusText);
+      } else if (statusText == "Printing...") {
+        broadcastStatus("progress", statusText);
+      } else if (statusText == "Idle") {
+        broadcastStatus("idle", statusText);
+      } else {
+        broadcastStatus("info", statusText);
+      }
+    }
+
+    if (m_Log) {
+      m_Log->information("[BrakeTesterHttpServer Info]: Print status broadcast thread stopping.");
+    }
+  });
+}
+
 std::string BrakeTesterHttpServer::buildSettingsStatePayloadText() const {
   const SerialSettings serialSettings = m_SettingsRepository.getSerialSettings();
+  const PrintSettings printSettings = m_PrintSettingsRepository.getPrintSettings();
   const auto devices = m_SerialDeviceStore.getDevices();
+  const auto printers = m_PrintManager.listPrinters();
 
   nlohmann::json deviceItems = nlohmann::json::array();
   for (const auto& device : devices) {
     deviceItems.push_back(device);
+  }
+
+  nlohmann::json printerItems = nlohmann::json::array();
+  for (const auto& printer : printers) {
+    printerItems.push_back({{"name", printer.name}, {"info", printer.info}});
   }
 
   const nlohmann::json payload = {
@@ -123,6 +195,10 @@ std::string BrakeTesterHttpServer::buildSettingsStatePayloadText() const {
       {"serialDevices", deviceItems},
       {"lptDevicePath", serialSettings.lptDevicePath},
       {"brakeTesterDevicePath", serialSettings.brakeTesterDevicePath},
+      {"printers", printerItems},
+      {"selectedPrinter", printSettings.selectedPrinter},
+      {"autoPrint", printSettings.autoPrint},
+      {"printStatus", m_PrintStatusStore.getStatus()},
   };
   return payload.dump();
 }
