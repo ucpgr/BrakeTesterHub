@@ -321,7 +321,7 @@
       {/if}
 
       <div class="mt-4 flex items-center justify-between border-t border-border pt-3">
-        {#if selectedTestDetails?.test?.pdfFile && pdfHrefFor(selectedTestDetails)}
+        {#if pdfHrefFor(selectedTestDetails)}
           <a
             class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/40"
             href={pdfHrefFor(selectedTestDetails)}
