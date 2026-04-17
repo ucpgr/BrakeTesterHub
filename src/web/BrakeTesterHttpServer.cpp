@@ -2,6 +2,7 @@
 #include "web/BrakeTesterHttpServerInternal.hpp"
 
 #include <atomic>
+#include <filesystem>
 #include <mutex>
 #include <thread>
 #include <unordered_set>
@@ -64,6 +65,17 @@ void BrakeTesterHttpServer::start() {
   if (m_Log) {
     m_Log->information("[BrakeTesterHttpServer Info]: Mounted static files at '/' from " + m_StaticRoot);
   }
+
+  const std::string testsRoot = std::filesystem::path("tests").string();
+  const bool testsMounted = m_Impl->server->set_mount_point("/tests", testsRoot);
+  if (m_Log) {
+    if (testsMounted) {
+      m_Log->information("[BrakeTesterHttpServer Info]: Mounted test artifacts at '/tests' from " + testsRoot);
+    } else {
+      m_Log->warning("[BrakeTesterHttpServer Warning]: Failed to mount '/tests' from " + testsRoot);
+    }
+  }
+
   configureLptModule();
   configureVehicleModule();
   configureStatusModule();
