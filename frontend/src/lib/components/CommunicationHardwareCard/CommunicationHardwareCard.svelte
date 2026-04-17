@@ -15,6 +15,10 @@
     import { runLptTest2 } from '$lib/stores/settings';
 
     let selectedDevice = '';
+    let lptSelection = '';
+    let brakeTesterSelection = '';
+    let lptOptions = [];
+    let brakeTesterOptions = [];
 
     onMount(() => {
         connectSettingsSocket();
@@ -34,6 +38,39 @@
         selectedDevice = '';
     }
 
+    function handleLptSelectionChange(event) {
+        const devicePath = event.currentTarget.value;
+        if (!devicePath) {
+            unassignLptDevice();
+            return;
+        }
+
+        assignLptDevice(devicePath);
+    }
+
+    function handleBrakeTesterSelectionChange(event) {
+        const devicePath = event.currentTarget.value;
+        if (!devicePath) {
+            unassignBrakeTesterDevice();
+            return;
+        }
+
+        assignBrakeTesterDevice(devicePath);
+    }
+
+    function buildSelectionOptions(currentDevice) {
+        const options = [...$availableUnassignedDevices];
+        if (currentDevice && !options.includes(currentDevice)) {
+            options.unshift(currentDevice);
+        }
+        return options;
+    }
+
+    $: lptOptions = buildSelectionOptions($lptDevicePath);
+    $: brakeTesterOptions = buildSelectionOptions($brakeTesterDevicePath);
+    $: lptSelection = $lptDevicePath || '';
+    $: brakeTesterSelection = $brakeTesterDevicePath || '';
+
     $: if (selectedDevice && !$availableUnassignedDevices.includes(selectedDevice)) {
         selectedDevice = '';
     }
@@ -45,24 +82,54 @@
     </CardHeader>
 
     <CardContent class="space-y-4 text-foreground">
-        <div class="grid gap-4 lg:grid-cols-[1fr_28rem]">
+        <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] md:items-start">
             <div class="flex h-full flex-col justify-center gap-3">
-                <div class="grid grid-cols-[7rem_1fr_auto_auto] items-center gap-2">
-                    <span class="text-sm text-muted-foreground">Lpt:</span>
-                    <input class="h-9 rounded-md border border-border bg-muted px-2 text-sm text-foreground" readonly value={$lptDevicePath || 'Unassigned'} />
-                    <Button variant="secondary" size="icon" onclick={assignToLpt} disabled={!selectedDevice} aria-label="Assign selected serial device to Lpt">&lt;</Button>
-                    <Button variant="outline" size="icon" onclick={unassignLptDevice} disabled={!$lptDevicePath} aria-label="Unassign Lpt serial device">&gt;</Button>
+                <div class="grid gap-2 md:hidden">
+                    <label for="lpt-device-select" class="text-sm text-muted-foreground">Lpt:</label>
+                    <select
+                        id="lpt-device-select"
+                        class="h-9 rounded-md border border-border bg-muted px-2 text-sm text-foreground"
+                        bind:value={lptSelection}
+                        onchange={handleLptSelectionChange}
+                    >
+                        <option value="">Unassigned</option>
+                        {#each lptOptions as devicePath}
+                            <option value={devicePath}>{devicePath}</option>
+                        {/each}
+                    </select>
                 </div>
 
-                <div class="grid grid-cols-[7rem_1fr_auto_auto] items-center gap-2">
+                <div class="grid gap-2 md:hidden">
+                    <label for="braketester-device-select" class="text-sm text-muted-foreground">BrakeTester:</label>
+                    <select
+                        id="braketester-device-select"
+                        class="h-9 rounded-md border border-border bg-muted px-2 text-sm text-foreground"
+                        bind:value={brakeTesterSelection}
+                        onchange={handleBrakeTesterSelectionChange}
+                    >
+                        <option value="">Unassigned</option>
+                        {#each brakeTesterOptions as devicePath}
+                            <option value={devicePath}>{devicePath}</option>
+                        {/each}
+                    </select>
+                </div>
+
+                <div class="hidden grid-cols-[7rem_minmax(0,1fr)_auto_auto] items-center gap-2 md:grid">
+                    <span class="text-sm text-muted-foreground">Lpt:</span>
+                    <input class="h-9 min-w-0 rounded-md border border-border bg-muted px-2 text-sm text-foreground" readonly value={$lptDevicePath || 'Unassigned'} />
+                    <Button class="shrink-0" variant="secondary" size="icon" onclick={assignToLpt} disabled={!selectedDevice} aria-label="Assign selected serial device to Lpt">&lt;</Button>
+                    <Button class="shrink-0" variant="outline" size="icon" onclick={unassignLptDevice} disabled={!$lptDevicePath} aria-label="Unassign Lpt serial device">&gt;</Button>
+                </div>
+
+                <div class="hidden grid-cols-[7rem_minmax(0,1fr)_auto_auto] items-center gap-2 md:grid">
                     <span class="text-sm text-muted-foreground">BrakeTester:</span>
-                    <input class="h-9 rounded-md border border-border bg-muted px-2 text-sm text-foreground" readonly value={$brakeTesterDevicePath || 'Unassigned'} />
-                    <Button variant="secondary" size="icon" onclick={assignToBrakeTester} disabled={!selectedDevice} aria-label="Assign selected serial device to BrakeTester">&lt;</Button>
-                    <Button variant="outline" size="icon" onclick={unassignBrakeTesterDevice} disabled={!$brakeTesterDevicePath} aria-label="Unassign BrakeTester serial device">&gt;</Button>
+                    <input class="h-9 min-w-0 rounded-md border border-border bg-muted px-2 text-sm text-foreground" readonly value={$brakeTesterDevicePath || 'Unassigned'} />
+                    <Button class="shrink-0" variant="secondary" size="icon" onclick={assignToBrakeTester} disabled={!selectedDevice} aria-label="Assign selected serial device to BrakeTester">&lt;</Button>
+                    <Button class="shrink-0" variant="outline" size="icon" onclick={unassignBrakeTesterDevice} disabled={!$brakeTesterDevicePath} aria-label="Unassign BrakeTester serial device">&gt;</Button>
                 </div>
             </div>
 
-            <div>
+            <div class="hidden md:block">
                 <label for="serial-device-list" class="mb-1 block text-sm text-muted-foreground">Available serial devices</label>
                 <select
                     id="serial-device-list"
