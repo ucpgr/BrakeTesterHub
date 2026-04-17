@@ -41,6 +41,12 @@ public:
 class ILptRepository {
 public:
   virtual ~ILptRepository() = default;
+  virtual int createTest(const HistoricalTest& test, const std::vector<HistoricalAxleResult>& axleResults) = 0;
+  virtual HistoricalPage getTests(const HistoricalTestQuery& query) const = 0;
+  virtual bool tryGetTestDetails(int testId, HistoricalTestDetails& details) const = 0;
+  virtual bool deleteTest(int testId) = 0;
+  virtual int getResultsPerPagePreference() const = 0;
+  virtual void setResultsPerPagePreference(int value) = 0;
 };
 
 class IPrintStatusStore {
