@@ -3,6 +3,8 @@
   import { Card, CardHeader, CardTitle, CardContent } from '$lib/components/ui/card';
 
   const perPageOptions = Array.from({ length: 10 }, (_, index) => (index + 1) * 10);
+  const thumbnailHeightPx = 100;
+  const thumbnailWidthPx = Math.round(thumbnailHeightPx / Math.SQRT2);
 
   let loading = false;
   let errorText = '';
@@ -18,13 +20,7 @@
   let filterMonths = [];
   let filterVehicles = [];
   let totalCount = 0;
-
-  let modalOpen = false;
-  let modalLoading = false;
-  let selectedTestSummary = null;
-  let selectedTestDetails = null;
-  const thumbnailHeightPx = 100;
-  const thumbnailWidthPx = Math.round(thumbnailHeightPx / Math.SQRT2);
+  let detailsByTestId = {};
 
   function formatDateTime(utcText) {
     if (!utcText) return 'Unknown date';
@@ -44,6 +40,46 @@
     if (outcome === 'pass') return 'Pass';
     if (outcome === 'fail') return 'Fail';
     return 'Unknown';
+  }
+
+  function withDefault(value, fallback = '—') {
+    return value === null || value === undefined || value === '' ? fallback : value;
+  }
+
+  function formatBrakeForce(row) {
+    const left = withDefault(row?.leftBrakeForce);
+    const right = withDefault(row?.rightBrakeForce);
+    return `${left} / ${right}`;
+  }
+
+  function rowsForType(details, type) {
+    const rows = details?.axleResults?.filter((row) => row.testType === type) ?? [];
+    return [...rows].sort((a, b) => (Number(a.axleIndex) || 0) - (Number(b.axleIndex) || 0));
+  }
+
+  async function fetchDetailsForTests(historyTests) {
+    if (!historyTests.length) {
+      detailsByTestId = {};
+      return;
+    }
+
+    const entries = await Promise.all(
+      historyTests.map(async (test) => {
+        try {
+          const response = await fetch(`/api/history/${test.id}`);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const details = await response.json();
+          return [test.id, details];
+        } catch (error) {
+          console.error(`Failed to fetch test details for test ${test.id}`, error);
+          return [test.id, null];
+        }
+      })
+    );
+
+    detailsByTestId = Object.fromEntries(entries);
   }
 
   async function loadHistory() {
@@ -81,59 +117,17 @@
       if (selectedVehicle !== 'all' && !filterVehicles.includes(selectedVehicle)) {
         selectedVehicle = 'all';
       }
+
+      await fetchDetailsForTests(tests);
     } catch (error) {
       console.error('Failed to fetch history', error);
       errorText = 'Failed to load history.';
       tests = [];
       totalCount = 0;
+      detailsByTestId = {};
     } finally {
       loading = false;
     }
-  }
-
-  async function openDetails(test) {
-    modalOpen = true;
-    modalLoading = true;
-    selectedTestSummary = test ?? null;
-    selectedTestDetails = null;
-
-    try {
-      const response = await fetch(`/api/history/${test.id}`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      selectedTestDetails = await response.json();
-    } catch (error) {
-      console.error('Failed to fetch test details', error);
-      selectedTestDetails = null;
-    } finally {
-      modalLoading = false;
-    }
-  }
-
-  function closeModal() {
-    modalOpen = false;
-    selectedTestSummary = null;
-    selectedTestDetails = null;
-  }
-
-  function withDefault(value, fallback = '—') {
-    return value === null || value === undefined || value === '' ? fallback : value;
-  }
-
-  function totalsForType(type) {
-    const rows = selectedTestDetails?.axleResults?.filter((row) => row.testType === type) ?? [];
-
-    const sum = (property) => rows.reduce((total, row) => total + (Number(row[property]) || 0), 0);
-
-    return {
-      leftBrakeForce: sum('leftBrakeForce'),
-      rightBrakeForce: sum('rightBrakeForce'),
-      efficiency: sum('efficiency'),
-      imbalance: sum('imbalance'),
-      weight: sum('weight')
-    };
   }
 
   function resetPageAndLoad() {
@@ -161,17 +155,8 @@
     return normalized.startsWith('/') ? normalized : `/${normalized}`;
   }
 
-  function handleModalBackdropKeydown(event) {
-    if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      closeModal();
-    }
-  }
-
-  function handleBackdropClick(event) {
-    if (event.target === event.currentTarget) {
-      closeModal();
-    }
+  function preventEventBubble(event) {
+    event.stopPropagation();
   }
 
   onMount(async () => {
@@ -236,28 +221,96 @@
     {:else}
       <div class="space-y-2">
         {#each tests as test}
-          <button type="button" class="flex w-full items-center gap-3 rounded-md border border-border bg-background p-3 text-left hover:bg-muted/40" on:click={() => openDetails(test)}>
-            {#if thumbnailHrefForTest(test)}
-              <img
-                src={thumbnailHrefForTest(test)}
-                alt="Test report thumbnail"
-                class="shrink-0 rounded border border-border bg-white object-contain"
-                style={`height: ${thumbnailHeightPx}px; width: ${thumbnailWidthPx}px;`}
-                loading="lazy"
-              />
-            {:else}
-              <div
-                class="shrink-0 rounded border border-border bg-white"
-                style={`height: ${thumbnailHeightPx}px; width: ${thumbnailWidthPx}px;`}
-                aria-label="No thumbnail available"
-              ></div>
-            {/if}
-            <div class="min-w-0 flex-1 space-y-1">
+          <div class="grid w-full gap-4 rounded-md border border-border bg-background p-3 md:grid-cols-[170px_1fr]" data-testid={`history-row-${test.id}`}>
+            <div class="space-y-2" data-testid={`history-meta-${test.id}`}>
+              {#if thumbnailHrefForTest(test)}
+                <a
+                  href={thumbnailHrefForTest(test)}
+                  target="_blank"
+                  rel="noreferrer"
+                  class="inline-block"
+                  aria-label="Open thumbnail image"
+                  on:click={preventEventBubble}
+                >
+                  <img
+                    src={thumbnailHrefForTest(test)}
+                    alt="Test report thumbnail"
+                    class="shrink-0 rounded border border-border bg-white object-contain"
+                    style={`height: ${thumbnailHeightPx}px; width: ${thumbnailWidthPx}px;`}
+                    loading="lazy"
+                  />
+                </a>
+              {:else}
+                <div
+                  class="shrink-0 rounded border border-border bg-white"
+                  style={`height: ${thumbnailHeightPx}px; width: ${thumbnailWidthPx}px;`}
+                  aria-label="No thumbnail available"
+                ></div>
+              {/if}
+
               <div class="text-sm font-semibold {test.vehicle?.reg ? 'text-foreground' : 'text-muted-foreground'}">{test.vehicle?.reg || 'NA'}</div>
               <div class="text-xs text-muted-foreground">{formatDateTime(test.createdAtUtc)}</div>
+              {#if test.pdfFile && pdfHrefForTest(test)}
+                <a
+                  class="inline-flex w-fit rounded border border-border px-2 py-1 text-xs text-foreground hover:bg-muted/40"
+                  href={pdfHrefForTest(test)}
+                  target="_blank"
+                  rel="noreferrer"
+                  data-testid={`history-pdf-${test.id}`}
+                >
+                  Open PDF
+                </a>
+              {:else}
+                <span class="inline-flex w-fit rounded border border-border px-2 py-1 text-xs text-muted-foreground">PDF unavailable</span>
+              {/if}
               <div class="text-sm font-medium {statusClass(test.outcome)}">{statusLabel(test.outcome)}</div>
             </div>
-          </button>
+
+            <div class="min-w-0 space-y-3" data-testid={`history-inline-details-${test.id}`}>
+              {#if !detailsByTestId[test.id]}
+                <div class="text-sm text-muted-foreground">No inline details available.</div>
+              {:else}
+                <div class="grid gap-3 lg:grid-cols-2">
+                  {#each [
+                    { key: 'service', label: 'Service' },
+                    { key: 'hand_brake', label: 'Handbrake' }
+                  ] as group}
+                    <section class="overflow-x-auto rounded border border-border/70">
+                      <h4 class="border-b border-border/70 bg-muted/30 px-2 py-1 text-sm font-semibold">{group.label}</h4>
+                      <table class="w-full border-collapse text-xs sm:text-sm">
+                        <thead>
+                          <tr class="border-b border-border/50 text-left">
+                            <th class="px-2 py-1">Axle</th>
+                            <th class="px-2 py-1">Brake Force</th>
+                            <th class="px-2 py-1">Efficiency</th>
+                            <th class="px-2 py-1">Imbalance</th>
+                            <th class="px-2 py-1">Weight</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {#if rowsForType(detailsByTestId[test.id], group.key).length === 0}
+                            <tr>
+                              <td class="px-2 py-2 text-muted-foreground" colspan="5">No {group.label.toLowerCase()} data.</td>
+                            </tr>
+                          {:else}
+                            {#each rowsForType(detailsByTestId[test.id], group.key) as row}
+                              <tr class="border-b border-border/40 last:border-0">
+                                <td class="px-2 py-1 align-top font-medium">{withDefault(row.axleIndex)}</td>
+                                <td class="px-2 py-1 align-top">{formatBrakeForce(row)}</td>
+                                <td class="px-2 py-1 align-top">{withDefault(row.efficiency)}</td>
+                                <td class="px-2 py-1 align-top">{withDefault(row.imbalance)}</td>
+                                <td class="px-2 py-1 align-top">{withDefault(row.weight)}</td>
+                              </tr>
+                            {/each}
+                          {/if}
+                        </tbody>
+                      </table>
+                    </section>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          </div>
         {/each}
       </div>
 
@@ -265,7 +318,10 @@
         <button
           type="button"
           class="rounded border border-border px-3 py-1 disabled:opacity-50"
-          on:click={() => { currentPage -= 1; loadHistory(); }}
+          on:click={() => {
+            currentPage -= 1;
+            loadHistory();
+          }}
           disabled={currentPage <= 1}
         >
           Previous
@@ -274,8 +330,11 @@
         <button
           type="button"
           class="rounded border border-border px-3 py-1 disabled:opacity-50"
-          on:click={() => { currentPage += 1; loadHistory(); }}
-          disabled={(currentPage * Number(selectedPerPage)) >= totalCount}
+          on:click={() => {
+            currentPage += 1;
+            loadHistory();
+          }}
+          disabled={currentPage * Number(selectedPerPage) >= totalCount}
         >
           Next
         </button>
@@ -283,90 +342,3 @@
     {/if}
   </CardContent>
 </Card>
-
-{#if modalOpen}
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-    role="button"
-    tabindex="0"
-    aria-label="Close modal backdrop"
-    on:click={handleBackdropClick}
-    on:keydown={handleModalBackdropKeydown}
-  >
-    <div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-4" role="dialog" aria-modal="true">
-      {#if modalLoading}
-        <div class="text-sm text-muted-foreground">Loading test details…</div>
-      {:else if !selectedTestDetails}
-        <div class="space-y-4">
-          <div class="text-sm text-red-500">Failed to load test details.</div>
-        </div>
-      {:else}
-        <div class="mb-4">
-          <h2 class="text-lg font-semibold">{selectedTestDetails.test?.vehicle?.reg || selectedTestSummary?.vehicle?.reg || 'NA'}</h2>
-          <p class="text-sm text-muted-foreground">{formatDateTime(selectedTestDetails.test?.createdAtUtc || selectedTestSummary?.createdAtUtc)}</p>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full border-collapse text-sm">
-            <thead>
-              <tr class="border-b border-border text-left">
-                <th class="px-2 py-2">Type</th>
-                <th class="px-2 py-2">L force</th>
-                <th class="px-2 py-2">R force</th>
-                <th class="px-2 py-2">Efficiency</th>
-                <th class="px-2 py-2">Imbalance</th>
-                <th class="px-2 py-2">Weight</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each selectedTestDetails.axleResults ?? [] as row}
-                <tr class="border-b border-border/60">
-                  <td class="px-2 py-2">{withDefault(row.testType)}</td>
-                  <td class="px-2 py-2">{withDefault(row.leftBrakeForce)}</td>
-                  <td class="px-2 py-2">{withDefault(row.rightBrakeForce)}</td>
-                  <td class="px-2 py-2">{withDefault(row.efficiency)}</td>
-                  <td class="px-2 py-2">{withDefault(row.imbalance)}</td>
-                  <td class="px-2 py-2">{withDefault(row.weight)}</td>
-                </tr>
-              {/each}
-              <tr class="bg-muted/40 font-medium">
-                <td class="px-2 py-2">Service total</td>
-                <td class="px-2 py-2">{totalsForType('service').leftBrakeForce}</td>
-                <td class="px-2 py-2">{totalsForType('service').rightBrakeForce}</td>
-                <td class="px-2 py-2">{totalsForType('service').efficiency}</td>
-                <td class="px-2 py-2">{totalsForType('service').imbalance}</td>
-                <td class="px-2 py-2">{totalsForType('service').weight}</td>
-              </tr>
-
-              <tr class="bg-muted/40 font-medium">
-                <td class="px-2 py-2">Hand brake total</td>
-                <td class="px-2 py-2">{totalsForType('hand_brake').leftBrakeForce}</td>
-                <td class="px-2 py-2">{totalsForType('hand_brake').rightBrakeForce}</td>
-                <td class="px-2 py-2">{totalsForType('hand_brake').efficiency}</td>
-                <td class="px-2 py-2">{totalsForType('hand_brake').imbalance}</td>
-                <td class="px-2 py-2">{totalsForType('hand_brake').weight}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-      {/if}
-
-      <div class="mt-4 flex items-center justify-between border-t border-border pt-3">
-        {#if selectedTestSummary?.pdfFile && pdfHrefForTest(selectedTestSummary)}
-          <a
-            class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/40"
-            href={pdfHrefForTest(selectedTestSummary)}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open PDF
-          </a>
-        {:else}
-          <button type="button" class="rounded border border-border px-3 py-1 text-sm text-muted-foreground disabled:opacity-60" disabled>Open PDF</button>
-        {/if}
-        <button type="button" class="rounded border border-border px-3 py-1 text-foreground hover:bg-muted/40" on:click={closeModal}>Close</button>
-      </div>
-    </div>
-  </div>
-{/if}
