@@ -267,7 +267,6 @@
       {:else if !selectedTestDetails}
         <div class="space-y-4">
           <div class="text-sm text-red-500">Failed to load test details.</div>
-          <button type="button" class="rounded border border-border px-3 py-1" on:click={closeModal}>Close</button>
         </div>
       {:else}
         <div class="mb-4">
@@ -319,22 +318,23 @@
           </table>
         </div>
 
-        <div class="mt-4 flex items-center justify-between">
-          {#if selectedTestDetails.test?.pdfFile && pdfHrefFor(selectedTestDetails)}
-            <a
-              class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/40"
-              href={pdfHrefFor(selectedTestDetails)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Open PDF
-            </a>
-          {:else}
-            <button type="button" class="rounded border border-border px-3 py-1 text-sm text-muted-foreground disabled:opacity-60" disabled>Open PDF</button>
-          {/if}
-          <button type="button" class="rounded border border-border px-3 py-1 text-foreground hover:bg-muted/40" on:click={closeModal}>Close</button>
-        </div>
       {/if}
+
+      <div class="mt-4 flex items-center justify-between border-t border-border pt-3">
+        {#if selectedTestDetails?.test?.pdfFile && pdfHrefFor(selectedTestDetails)}
+          <a
+            class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/40"
+            href={pdfHrefFor(selectedTestDetails)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open PDF
+          </a>
+        {:else}
+          <button type="button" class="rounded border border-border px-3 py-1 text-sm text-muted-foreground disabled:opacity-60" disabled>Open PDF</button>
+        {/if}
+        <button type="button" class="rounded border border-border px-3 py-1 text-foreground hover:bg-muted/40" on:click={closeModal}>Close</button>
+      </div>
     </div>
   </div>
 {/if}
