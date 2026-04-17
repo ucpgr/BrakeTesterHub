@@ -61,6 +61,7 @@ struct HistoricalTest {
   std::string createdAtUtc;
   std::optional<std::string> prnFile;
   std::string pdfFile;
+  std::optional<std::string> thumbnailFile;
   TestOutcome outcome{TestOutcome::Unknown};
   std::optional<HistoricalVehicle> vehicle;
 };
@@ -114,7 +115,8 @@ enum class LptProcessStatus {
   TransferStarted,
   DataPatched,
   ConversionStarted,
-  ConversionFinished
+  ConversionFinished,
+  ThumbnailGenerated
 };
 
 } // namespace brake_tester

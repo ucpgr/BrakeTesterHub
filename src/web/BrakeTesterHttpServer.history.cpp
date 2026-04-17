@@ -78,6 +78,11 @@ void BrakeTesterHttpServer::configureHistoryModule() {
         } else {
           item["prnFile"] = nullptr;
         }
+        if (test.thumbnailFile.has_value()) {
+          item["thumbnailFile"] = *test.thumbnailFile;
+        } else {
+          item["thumbnailFile"] = nullptr;
+        }
 
         if (test.vehicle.has_value()) {
           item["vehicle"] = {
@@ -159,6 +164,11 @@ void BrakeTesterHttpServer::configureHistoryModule() {
         testJson["prnFile"] = *details.test.prnFile;
       } else {
         testJson["prnFile"] = nullptr;
+      }
+      if (details.test.thumbnailFile.has_value()) {
+        testJson["thumbnailFile"] = *details.test.thumbnailFile;
+      } else {
+        testJson["thumbnailFile"] = nullptr;
       }
       if (details.test.vehicle.has_value()) {
         testJson["vehicle"] = {

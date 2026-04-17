@@ -63,6 +63,9 @@ void BrakeTesterHttpServer::startLptBroadcastLoop() {
         case LptProcessStatus::ConversionFinished:
           broadcastStatus("info", "Document conversion finished");
           break;
+        case LptProcessStatus::ThumbnailGenerated:
+          broadcastStatus("info", "Thumbnail generated");
+          break;
         default:
           broadcastStatus("idle", "Idle");
           break;
