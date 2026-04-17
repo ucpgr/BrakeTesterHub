@@ -204,15 +204,18 @@ void LptManager::sendTestSignal(bool enableTestFlag) {
 
 std::optional<std::string> LptManager::generateThumbnailForPdf(const std::filesystem::path& pdfPath) const {
   try {
+    auto outputPrefixPath = pdfPath;
+    outputPrefixPath.replace_extension();
     auto pngPath = pdfPath;
     pngPath.replace_extension(".png");
     if (m_Log) {
       m_Log->information("[LptManager Info]: Generating thumbnail for PDF '" + pdfPath.string() +
-                         "' using pdftocairo. Target PNG path: " + pngPath.string());
+                         "' using pdftocairo. Output prefix: " + outputPrefixPath.string() +
+                         ", expected PNG path: " + pngPath.string());
     }
 
     const std::string command = "pdftocairo \"" + pdfPath.string() +
-                                "\" -png -singlefile -scale-to-y 100 -r 600 \"" + pngPath.string() + "\"";
+                                "\" -png -singlefile -scale-to 600 \"" + outputPrefixPath.string() + "\"";
     if (m_Log) {
       m_Log->information("[LptManager Info]: Executing command: " + command);
     }
