@@ -88,7 +88,7 @@
                     <label for="lpt-device-select" class="text-sm text-muted-foreground">Lpt:</label>
                     <select
                         id="lpt-device-select"
-                        class="h-9 rounded-md border border-border bg-muted px-2 text-sm text-foreground"
+                        class="h-9 w-full min-w-0 max-w-full rounded-md border border-border bg-muted px-2 text-sm text-foreground"
                         bind:value={lptSelection}
                         onchange={handleLptSelectionChange}
                     >
@@ -103,7 +103,7 @@
                     <label for="braketester-device-select" class="text-sm text-muted-foreground">BrakeTester:</label>
                     <select
                         id="braketester-device-select"
-                        class="h-9 rounded-md border border-border bg-muted px-2 text-sm text-foreground"
+                        class="h-9 w-full min-w-0 max-w-full rounded-md border border-border bg-muted px-2 text-sm text-foreground"
                         bind:value={brakeTesterSelection}
                         onchange={handleBrakeTesterSelectionChange}
                     >
@@ -129,12 +129,12 @@
                 </div>
             </div>
 
-            <div class="hidden md:block">
+            <div class="hidden min-w-0 md:block">
                 <label for="serial-device-list" class="mb-1 block text-sm text-muted-foreground">Available serial devices</label>
                 <select
                     id="serial-device-list"
                     size="8"
-                    class="w-full rounded-md border border-border bg-muted p-2 text-sm text-foreground"
+                    class="w-full min-w-0 max-w-full rounded-md border border-border bg-muted p-2 text-sm text-foreground"
                     bind:value={selectedDevice}
                 >
                     {#if $availableUnassignedDevices.length === 0}
