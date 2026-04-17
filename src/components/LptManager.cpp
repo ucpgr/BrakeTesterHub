@@ -10,11 +10,30 @@
 #include <thread>
 
 namespace brake_tester {
+namespace {
+std::string currentUtcIsoDateTime() {
+  const auto now = std::chrono::system_clock::now();
+  const std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
+
+  std::tm utcTime{};
+#ifdef _WIN32
+  gmtime_s(&utcTime, &nowTime);
+#else
+  gmtime_r(&nowTime, &utcTime);
+#endif
+
+  std::ostringstream output;
+  output << std::put_time(&utcTime, "%Y-%m-%d %H:%M:%S");
+  return output.str();
+}
+} // namespace
 
 LptManager::LptManager(std::unique_ptr<ILptListener> listener,
                        std::unique_ptr<IPrnPatcher> patcher,
                        std::unique_ptr<IPrnRenderer> renderer,
                        std::unique_ptr<IPrnWriter> prnWriter,
+                       ILptRepository& lptRepository,
+                       ISelectedVehicleStore& selectedVehicleStore,
                        ILptStore& lptStore,
                        const ISettingsRepository& settingsRepository,
                        SharedLogger log)
@@ -22,6 +41,8 @@ LptManager::LptManager(std::unique_ptr<ILptListener> listener,
       m_Patcher(std::move(patcher)),
       m_Renderer(std::move(renderer)),
       m_PrnWriter(std::move(prnWriter)),
+      m_LptRepository(lptRepository),
+      m_SelectedVehicleStore(selectedVehicleStore),
       m_LptStore(lptStore),
       m_SettingsRepository(settingsRepository),
       m_Log(std::move(log)) {
@@ -89,6 +110,24 @@ void LptManager::start() {
         if (m_Log) {
           m_Log->information("[LptManager Info]: Conversion finished for: " + captureFilename + ".prn");
         }
+
+        const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
+        HistoricalTest historicalTest;
+        historicalTest.createdAtUtc = currentUtcIsoDateTime();
+        historicalTest.prnFile = captureFilename + ".prn";
+        historicalTest.pdfFile = captureFilename + ".prn.pdf";
+        historicalTest.outcome = TestOutcome::Unknown;
+
+        if (!selectedVehicle.reg.empty()) {
+          HistoricalVehicle historicalVehicle;
+          historicalVehicle.reg = selectedVehicle.reg;
+          historicalVehicle.make = selectedVehicle.make.empty() ? std::nullopt : std::optional<std::string>(selectedVehicle.make);
+          historicalVehicle.model = selectedVehicle.model.empty() ? std::nullopt : std::optional<std::string>(selectedVehicle.model);
+          historicalVehicle.mileage = selectedVehicle.mileage;
+          historicalTest.vehicle = historicalVehicle;
+        }
+
+        m_LptRepository.createTest(historicalTest, {});
       } catch (const std::exception& processingException) {
         if (m_Log) {
           m_Log->Error(processingException.what());

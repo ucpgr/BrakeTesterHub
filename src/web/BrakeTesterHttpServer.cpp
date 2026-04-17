@@ -14,6 +14,7 @@ namespace brake_tester {
 
 
 BrakeTesterHttpServer::BrakeTesterHttpServer(ILptStore& lptStore,
+                                             ILptRepository& lptRepository,
                                              ISettingsRepository& settingsRepository,
                                              IPrintSettingsRepository& printSettingsRepository,
                                              ISerialDeviceStore& serialDeviceStore,
@@ -27,6 +28,7 @@ BrakeTesterHttpServer::BrakeTesterHttpServer(ILptStore& lptStore,
                                              int port,
                                              std::string staticRoot)
     : m_LptStore(lptStore),
+      m_LptRepository(lptRepository),
       m_SettingsRepository(settingsRepository),
       m_PrintSettingsRepository(printSettingsRepository),
       m_SerialDeviceStore(serialDeviceStore),
@@ -66,6 +68,7 @@ void BrakeTesterHttpServer::start() {
   configureVehicleModule();
   configureStatusModule();
   configureSettingsModule();
+  configureHistoryModule();
   startLptBroadcastLoop();
   startSettingsBroadcastLoop();
   startPrintStatusBroadcastLoop();

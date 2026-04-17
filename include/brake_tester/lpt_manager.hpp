@@ -15,6 +15,8 @@ public:
              std::unique_ptr<IPrnPatcher> patcher,
              std::unique_ptr<IPrnRenderer> renderer,
              std::unique_ptr<IPrnWriter> prnWriter,
+             ILptRepository& lptRepository,
+             ISelectedVehicleStore& selectedVehicleStore,
              ILptStore& lptStore,
              const ISettingsRepository& settingsRepository,
              SharedLogger log);
@@ -35,6 +37,8 @@ private:
   std::unique_ptr<IPrnPatcher> m_Patcher;
   std::unique_ptr<IPrnRenderer> m_Renderer;
   std::unique_ptr<IPrnWriter> m_PrnWriter;
+  ILptRepository& m_LptRepository;
+  ISelectedVehicleStore& m_SelectedVehicleStore;
   ILptStore& m_LptStore;
   const ISettingsRepository& m_SettingsRepository;
   SharedLogger m_Log;
