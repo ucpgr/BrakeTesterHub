@@ -87,6 +87,7 @@ void LptRepository::initializeSchema() const {
       "created_at_utc TEXT NOT NULL,"
       "prnFile TEXT,"
       "pdfFile TEXT NOT NULL,"
+      "thumbnailFile TEXT,"
       "outcome TEXT NOT NULL DEFAULT 'unknown',"
       "historical_vehicle_id INTEGER,"
       "FOREIGN KEY (historical_vehicle_id) REFERENCES historical_vehicles(id) ON DELETE SET NULL"
@@ -126,6 +127,34 @@ void LptRepository::initializeSchema() const {
       sqlite3_free(errorMessage);
       throw std::runtime_error(message);
     }
+  }
+
+  bool thumbnailFileColumnExists = false;
+  sqlite3_stmt* tableInfoStatement = nullptr;
+  if (sqlite3_prepare_v2(m_DatabaseHandle, "PRAGMA table_info(tests)", -1, &tableInfoStatement, nullptr) == SQLITE_OK) {
+    StatementFinalizer tableInfoFinalizer(tableInfoStatement);
+    while (sqlite3_step(tableInfoStatement) == SQLITE_ROW) {
+      const auto* columnNameRaw = reinterpret_cast<const char*>(sqlite3_column_text(tableInfoStatement, 1));
+      if (columnNameRaw != nullptr && std::string(columnNameRaw) == "thumbnailFile") {
+        thumbnailFileColumnExists = true;
+        break;
+      }
+    }
+  }
+
+  if (!thumbnailFileColumnExists) {
+    if (m_Log) {
+      m_Log->information("[LptRepository Info]: Applying schema migration for tests.thumbnailFile column.");
+    }
+    char* errorMessage = nullptr;
+    if (sqlite3_exec(m_DatabaseHandle, "ALTER TABLE tests ADD COLUMN thumbnailFile TEXT", nullptr, nullptr, &errorMessage) !=
+        SQLITE_OK) {
+      const std::string message = (errorMessage != nullptr) ? errorMessage : "Unknown sqlite error";
+      sqlite3_free(errorMessage);
+      throw std::runtime_error(message);
+    }
+  } else if (m_Log) {
+    m_Log->information("[LptRepository Info]: tests.thumbnailFile column already present.");
   }
 
   sqlite3_exec(m_DatabaseHandle,
@@ -208,7 +237,7 @@ int LptRepository::createTest(const HistoricalTest& test, const std::vector<Hist
     }
 
     static constexpr const char* insertTestSql =
-        "INSERT INTO tests (created_at_utc, prnFile, pdfFile, outcome, historical_vehicle_id) VALUES (?, ?, ?, ?, ?)";
+        "INSERT INTO tests (created_at_utc, prnFile, pdfFile, thumbnailFile, outcome, historical_vehicle_id) VALUES (?, ?, ?, ?, ?, ?)";
 
     sqlite3_stmt* insertTestStatement = nullptr;
     if (sqlite3_prepare_v2(m_DatabaseHandle, insertTestSql, -1, &insertTestStatement, nullptr) != SQLITE_OK) {
@@ -224,6 +253,11 @@ int LptRepository::createTest(const HistoricalTest& test, const std::vector<Hist
       sqlite3_bind_null(insertTestStatement, bindIndex++);
     }
     sqlite3_bind_text(insertTestStatement, bindIndex++, test.pdfFile.c_str(), -1, SQLITE_TRANSIENT);
+    if (test.thumbnailFile.has_value() && !test.thumbnailFile->empty()) {
+      sqlite3_bind_text(insertTestStatement, bindIndex++, test.thumbnailFile->c_str(), -1, SQLITE_TRANSIENT);
+    } else {
+      sqlite3_bind_null(insertTestStatement, bindIndex++);
+    }
     const std::string outcome = outcomeToText(test.outcome);
     sqlite3_bind_text(insertTestStatement, bindIndex++, outcome.c_str(), -1, SQLITE_TRANSIENT);
     if (historicalVehicleId > 0) {
@@ -412,7 +446,7 @@ HistoricalPage LptRepository::getTests(const HistoricalTestQuery& query) const {
   }
 
   std::string selectSql =
-      "SELECT tests.id, tests.created_at_utc, tests.prnFile, tests.pdfFile, tests.outcome, "
+      "SELECT tests.id, tests.created_at_utc, tests.prnFile, tests.pdfFile, tests.thumbnailFile, tests.outcome, "
       "hv.id, hv.reg, hv.make, hv.model, hv.mileage" +
       fromClause +
       " ORDER BY tests.created_at_utc DESC LIMIT ? OFFSET ?";
@@ -444,22 +478,25 @@ HistoricalPage LptRepository::getTests(const HistoricalTestQuery& query) const {
       test.prnFile = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectStatement, 2)));
     }
     test.pdfFile = reinterpret_cast<const char*>(sqlite3_column_text(selectStatement, 3));
-    test.outcome = textToOutcome(reinterpret_cast<const char*>(sqlite3_column_text(selectStatement, 4)));
+    if (sqlite3_column_type(selectStatement, 4) != SQLITE_NULL) {
+      test.thumbnailFile = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectStatement, 4)));
+    }
+    test.outcome = textToOutcome(reinterpret_cast<const char*>(sqlite3_column_text(selectStatement, 5)));
 
-    if (sqlite3_column_type(selectStatement, 5) != SQLITE_NULL) {
+    if (sqlite3_column_type(selectStatement, 6) != SQLITE_NULL) {
       HistoricalVehicle vehicle;
-      vehicle.id = sqlite3_column_int(selectStatement, 5);
-      if (sqlite3_column_type(selectStatement, 6) != SQLITE_NULL) {
-        vehicle.reg = reinterpret_cast<const char*>(sqlite3_column_text(selectStatement, 6));
-      }
+      vehicle.id = sqlite3_column_int(selectStatement, 6);
       if (sqlite3_column_type(selectStatement, 7) != SQLITE_NULL) {
-        vehicle.make = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectStatement, 7)));
+        vehicle.reg = reinterpret_cast<const char*>(sqlite3_column_text(selectStatement, 7));
       }
       if (sqlite3_column_type(selectStatement, 8) != SQLITE_NULL) {
-        vehicle.model = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectStatement, 8)));
+        vehicle.make = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectStatement, 8)));
       }
       if (sqlite3_column_type(selectStatement, 9) != SQLITE_NULL) {
-        vehicle.mileage = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectStatement, 9)));
+        vehicle.model = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectStatement, 9)));
+      }
+      if (sqlite3_column_type(selectStatement, 10) != SQLITE_NULL) {
+        vehicle.mileage = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectStatement, 10)));
       }
       test.vehicle = vehicle;
     }
@@ -473,7 +510,7 @@ HistoricalPage LptRepository::getTests(const HistoricalTestQuery& query) const {
 
 bool LptRepository::tryGetTestDetails(int testId, HistoricalTestDetails& details) const {
   static constexpr const char* selectTestSql =
-      "SELECT tests.id, tests.created_at_utc, tests.prnFile, tests.pdfFile, tests.outcome, "
+      "SELECT tests.id, tests.created_at_utc, tests.prnFile, tests.pdfFile, tests.thumbnailFile, tests.outcome, "
       "hv.id, hv.reg, hv.make, hv.model, hv.mileage "
       "FROM tests "
       "LEFT JOIN historical_vehicles hv ON hv.id = tests.historical_vehicle_id "
@@ -497,22 +534,25 @@ bool LptRepository::tryGetTestDetails(int testId, HistoricalTestDetails& details
     test.prnFile = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectTestStatement, 2)));
   }
   test.pdfFile = reinterpret_cast<const char*>(sqlite3_column_text(selectTestStatement, 3));
-  test.outcome = textToOutcome(reinterpret_cast<const char*>(sqlite3_column_text(selectTestStatement, 4)));
+  if (sqlite3_column_type(selectTestStatement, 4) != SQLITE_NULL) {
+    test.thumbnailFile = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectTestStatement, 4)));
+  }
+  test.outcome = textToOutcome(reinterpret_cast<const char*>(sqlite3_column_text(selectTestStatement, 5)));
 
-  if (sqlite3_column_type(selectTestStatement, 5) != SQLITE_NULL) {
+  if (sqlite3_column_type(selectTestStatement, 6) != SQLITE_NULL) {
     HistoricalVehicle vehicle;
-    vehicle.id = sqlite3_column_int(selectTestStatement, 5);
-    if (sqlite3_column_type(selectTestStatement, 6) != SQLITE_NULL) {
-      vehicle.reg = reinterpret_cast<const char*>(sqlite3_column_text(selectTestStatement, 6));
-    }
+    vehicle.id = sqlite3_column_int(selectTestStatement, 6);
     if (sqlite3_column_type(selectTestStatement, 7) != SQLITE_NULL) {
-      vehicle.make = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectTestStatement, 7)));
+      vehicle.reg = reinterpret_cast<const char*>(sqlite3_column_text(selectTestStatement, 7));
     }
     if (sqlite3_column_type(selectTestStatement, 8) != SQLITE_NULL) {
-      vehicle.model = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectTestStatement, 8)));
+      vehicle.make = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectTestStatement, 8)));
     }
     if (sqlite3_column_type(selectTestStatement, 9) != SQLITE_NULL) {
-      vehicle.mileage = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectTestStatement, 9)));
+      vehicle.model = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectTestStatement, 9)));
+    }
+    if (sqlite3_column_type(selectTestStatement, 10) != SQLITE_NULL) {
+      vehicle.mileage = std::string(reinterpret_cast<const char*>(sqlite3_column_text(selectTestStatement, 10)));
     }
     test.vehicle = vehicle;
   }

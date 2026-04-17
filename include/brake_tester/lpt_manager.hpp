@@ -1,7 +1,9 @@
 #pragma once
 
 #include <atomic>
+#include <filesystem>
 #include <memory>
+#include <optional>
 #include <thread>
 
 #include "brake_tester/interfaces.hpp"
@@ -27,6 +29,7 @@ public:
   void sendTestSignal(bool enableTestFlag);
 
 private:
+  std::optional<std::string> generateThumbnailForPdf(const std::filesystem::path& pdfPath) const;
   static std::string generateCaptureFilenameWithoutExtension();
   static std::string randomSuffix();
 

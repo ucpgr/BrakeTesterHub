@@ -1,6 +1,7 @@
 #include "brake_tester/lpt_manager.hpp"
 
 #include <chrono>
+#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <iomanip>
@@ -111,11 +112,23 @@ void LptManager::start() {
           m_Log->information("[LptManager Info]: Conversion finished for: " + captureFilename + ".prn");
         }
 
+        const auto thumbnailFilePath = generateThumbnailForPdf(std::filesystem::path(captureFilename + ".prn.pdf"));
+        if (thumbnailFilePath.has_value()) {
+          m_LptStore.setProcessStatus(LptProcessStatus::ThumbnailGenerated);
+          if (m_Log) {
+            m_Log->information("[LptManager Info]: Thumbnail generated for capture key '" + captureFilename +
+                               "' at path: " + *thumbnailFilePath);
+          }
+        } else if (m_Log) {
+          m_Log->warning("[LptManager Warning]: Thumbnail not generated for capture key '" + captureFilename + "'.");
+        }
+
         const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
         HistoricalTest historicalTest;
         historicalTest.createdAtUtc = currentUtcIsoDateTime();
         historicalTest.prnFile = captureFilename + ".prn";
         historicalTest.pdfFile = captureFilename + ".prn.pdf";
+        historicalTest.thumbnailFile = thumbnailFilePath;
         historicalTest.outcome = TestOutcome::Unknown;
 
         if (!selectedVehicle.reg.empty()) {
@@ -186,6 +199,51 @@ void LptManager::sendTestSignal(bool enableTestFlag) {
     if (m_Log) {
       m_Log->Error(std::string("[LptManager Error]: Failed to send test signal. ") + testException.what());
     }
+  }
+}
+
+std::optional<std::string> LptManager::generateThumbnailForPdf(const std::filesystem::path& pdfPath) const {
+  try {
+    auto pngPath = pdfPath;
+    pngPath.replace_extension(".png");
+    if (m_Log) {
+      m_Log->information("[LptManager Info]: Generating thumbnail for PDF '" + pdfPath.string() +
+                         "' using pdftocairo. Target PNG path: " + pngPath.string());
+    }
+
+    const std::string command = "pdftocairo \"" + pdfPath.string() +
+                                "\" -png -singlefile -scale-to-y 100 -r 600 \"" + pngPath.string() + "\"";
+    if (m_Log) {
+      m_Log->information("[LptManager Info]: Executing command: " + command);
+    }
+
+    const int exitCode = std::system(command.c_str());
+    if (exitCode != 0) {
+      if (m_Log) {
+        m_Log->warning("[LptManager Warning]: Thumbnail command failed with exit code " + std::to_string(exitCode) +
+                       " for PDF: " + pdfPath.string());
+      }
+      return std::nullopt;
+    }
+
+    if (!std::filesystem::exists(pngPath)) {
+      if (m_Log) {
+        m_Log->warning("[LptManager Warning]: Thumbnail command succeeded but file does not exist at expected path: " +
+                       pngPath.string());
+      }
+      return std::nullopt;
+    }
+
+    if (m_Log) {
+      m_Log->information("[LptManager Info]: Thumbnail file verified at expected path: " + pngPath.string());
+    }
+    return pngPath.string();
+  } catch (const std::exception& thumbnailException) {
+    if (m_Log) {
+      m_Log->warning(std::string("[LptManager Warning]: Exception while generating thumbnail: ") +
+                     thumbnailException.what());
+    }
+    return std::nullopt;
   }
 }
 

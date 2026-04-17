@@ -195,6 +195,7 @@ std::string BrakeTesterHttpServer::lptEventNameForStatus(LptProcessStatus status
     case LptProcessStatus::DataPatched: return "lpt.data_patched";
     case LptProcessStatus::ConversionStarted: return "lpt.conversion_started";
     case LptProcessStatus::ConversionFinished: return "lpt.conversion_finished";
+    case LptProcessStatus::ThumbnailGenerated: return "lpt.thumbnail_generated";
     case LptProcessStatus::Idle:
     default: return "lpt.idle";
   }
