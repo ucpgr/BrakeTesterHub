@@ -293,7 +293,11 @@
         </div>
 
         <div class="mt-4 flex items-center justify-between">
-          <a class="text-sm text-blue-500 underline" href={selectedTestDetails.pdfUrl} target="_blank" rel="noreferrer">Open PDF</a>
+          {#if selectedTestDetails.test?.pdfFile}
+            <a class="text-sm text-blue-500 underline" href={selectedTestDetails.pdfUrl} target="_blank" rel="noreferrer">Open PDF</a>
+          {:else}
+            <button type="button" class="rounded border border-border px-3 py-1 text-sm text-muted-foreground disabled:opacity-60" disabled>Open PDF</button>
+          {/if}
           <button type="button" class="rounded border border-border px-3 py-1" on:click={closeModal}>Close</button>
         </div>
       {/if}
