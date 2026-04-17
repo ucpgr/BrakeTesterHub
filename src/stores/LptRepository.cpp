@@ -85,8 +85,8 @@ void LptRepository::initializeSchema() const {
       "CREATE TABLE IF NOT EXISTS tests ("
       "id INTEGER PRIMARY KEY,"
       "created_at_utc TEXT NOT NULL,"
-      "prn_file TEXT,"
-      "pdf_file TEXT NOT NULL,"
+      "prnFile TEXT,"
+      "pdfFile TEXT NOT NULL,"
       "outcome TEXT NOT NULL DEFAULT 'unknown',"
       "historical_vehicle_id INTEGER,"
       "FOREIGN KEY (historical_vehicle_id) REFERENCES historical_vehicles(id) ON DELETE SET NULL"
@@ -129,21 +129,11 @@ void LptRepository::initializeSchema() const {
   }
 
   sqlite3_exec(m_DatabaseHandle, "ALTER TABLE tests ADD COLUMN created_at_utc TEXT", nullptr, nullptr, nullptr);
-  sqlite3_exec(m_DatabaseHandle, "ALTER TABLE tests ADD COLUMN prn_file TEXT", nullptr, nullptr, nullptr);
-  sqlite3_exec(m_DatabaseHandle, "ALTER TABLE tests ADD COLUMN pdf_file TEXT", nullptr, nullptr, nullptr);
+  sqlite3_exec(m_DatabaseHandle, "ALTER TABLE tests ADD COLUMN prnFile TEXT", nullptr, nullptr, nullptr);
+  sqlite3_exec(m_DatabaseHandle, "ALTER TABLE tests ADD COLUMN pdfFile TEXT", nullptr, nullptr, nullptr);
   sqlite3_exec(m_DatabaseHandle, "ALTER TABLE tests ADD COLUMN outcome TEXT NOT NULL DEFAULT 'unknown'", nullptr, nullptr, nullptr);
   sqlite3_exec(m_DatabaseHandle, "ALTER TABLE tests ADD COLUMN historical_vehicle_id INTEGER", nullptr, nullptr, nullptr);
 
-  sqlite3_exec(m_DatabaseHandle,
-               "UPDATE tests SET prn_file = prnFile WHERE prn_file IS NULL AND prnFile IS NOT NULL",
-               nullptr,
-               nullptr,
-               nullptr);
-  sqlite3_exec(m_DatabaseHandle,
-               "UPDATE tests SET pdf_file = pdfFile WHERE pdf_file IS NULL AND pdfFile IS NOT NULL",
-               nullptr,
-               nullptr,
-               nullptr);
   sqlite3_exec(m_DatabaseHandle,
                "UPDATE tests SET created_at_utc = datetime('now') WHERE created_at_utc IS NULL",
                nullptr,
@@ -230,7 +220,7 @@ int LptRepository::createTest(const HistoricalTest& test, const std::vector<Hist
     }
 
     static constexpr const char* insertTestSql =
-        "INSERT INTO tests (created_at_utc, prn_file, pdf_file, outcome, historical_vehicle_id) VALUES (?, ?, ?, ?, ?)";
+        "INSERT INTO tests (created_at_utc, prnFile, pdfFile, outcome, historical_vehicle_id) VALUES (?, ?, ?, ?, ?)";
 
     sqlite3_stmt* insertTestStatement = nullptr;
     if (sqlite3_prepare_v2(m_DatabaseHandle, insertTestSql, -1, &insertTestStatement, nullptr) != SQLITE_OK) {
@@ -238,19 +228,20 @@ int LptRepository::createTest(const HistoricalTest& test, const std::vector<Hist
     }
     StatementFinalizer insertTestFinalizer(insertTestStatement);
 
-    sqlite3_bind_text(insertTestStatement, 1, test.createdAtUtc.c_str(), -1, SQLITE_TRANSIENT);
+    int bindIndex = 1;
+    sqlite3_bind_text(insertTestStatement, bindIndex++, test.createdAtUtc.c_str(), -1, SQLITE_TRANSIENT);
     if (test.prnFile.has_value() && !test.prnFile->empty()) {
-      sqlite3_bind_text(insertTestStatement, 2, test.prnFile->c_str(), -1, SQLITE_TRANSIENT);
+      sqlite3_bind_text(insertTestStatement, bindIndex++, test.prnFile->c_str(), -1, SQLITE_TRANSIENT);
     } else {
-      sqlite3_bind_null(insertTestStatement, 2);
+      sqlite3_bind_null(insertTestStatement, bindIndex++);
     }
-    sqlite3_bind_text(insertTestStatement, 3, test.pdfFile.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(insertTestStatement, bindIndex++, test.pdfFile.c_str(), -1, SQLITE_TRANSIENT);
     const std::string outcome = outcomeToText(test.outcome);
-    sqlite3_bind_text(insertTestStatement, 4, outcome.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(insertTestStatement, bindIndex++, outcome.c_str(), -1, SQLITE_TRANSIENT);
     if (historicalVehicleId > 0) {
-      sqlite3_bind_int(insertTestStatement, 5, historicalVehicleId);
+      sqlite3_bind_int(insertTestStatement, bindIndex++, historicalVehicleId);
     } else {
-      sqlite3_bind_null(insertTestStatement, 5);
+      sqlite3_bind_null(insertTestStatement, bindIndex++);
     }
 
     if (sqlite3_step(insertTestStatement) != SQLITE_DONE) {
@@ -432,7 +423,7 @@ HistoricalPage LptRepository::getTests(const HistoricalTestQuery& query) const {
   }
 
   std::string selectSql =
-      "SELECT tests.id, tests.created_at_utc, tests.prn_file, tests.pdf_file, tests.outcome, "
+      "SELECT tests.id, tests.created_at_utc, tests.prnFile, tests.pdfFile, tests.outcome, "
       "hv.id, hv.reg, hv.make, hv.model, hv.mileage" +
       fromClause +
       " ORDER BY tests.created_at_utc DESC LIMIT ? OFFSET ?";
@@ -493,7 +484,7 @@ HistoricalPage LptRepository::getTests(const HistoricalTestQuery& query) const {
 
 bool LptRepository::tryGetTestDetails(int testId, HistoricalTestDetails& details) const {
   static constexpr const char* selectTestSql =
-      "SELECT tests.id, tests.created_at_utc, tests.prn_file, tests.pdf_file, tests.outcome, "
+      "SELECT tests.id, tests.created_at_utc, tests.prnFile, tests.pdfFile, tests.outcome, "
       "hv.id, hv.reg, hv.make, hv.model, hv.mileage "
       "FROM tests "
       "LEFT JOIN historical_vehicles hv ON hv.id = tests.historical_vehicle_id "
