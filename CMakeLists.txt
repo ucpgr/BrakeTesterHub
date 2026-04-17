@@ -79,3 +79,9 @@ target_link_libraries(BrakeTesterHub PRIVATE
 target_compile_definitions(BrakeTesterHub PRIVATE
     BT_STATIC_ROOT="www"
 )
+
+add_custom_target(compile_check_core
+    COMMAND ${CMAKE_COMMAND} -E env CXX=${CMAKE_CXX_COMPILER} ${CMAKE_SOURCE_DIR}/scripts/compile_check_core.sh
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Running core compile-only checks (no external system deps required)"
+)
