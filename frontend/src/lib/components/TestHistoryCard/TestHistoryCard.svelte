@@ -136,6 +136,26 @@
     loadHistory();
   }
 
+  function pdfHrefFor(details) {
+    if (!details) return '';
+    if (details.pdfUrl) return details.pdfUrl;
+    const testId = details.test?.id;
+    return testId ? `/api/history/${testId}/pdf` : '';
+  }
+
+  function handleModalBackdropKeydown(event) {
+    if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      closeModal();
+    }
+  }
+
+  function handleBackdropClick(event) {
+    if (event.target === event.currentTarget) {
+      closeModal();
+    }
+  }
+
   onMount(async () => {
     await loadHistory();
   });
@@ -233,8 +253,15 @@
 </Card>
 
 {#if modalOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" on:click={closeModal}>
-    <div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-4" on:click|stopPropagation>
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    role="button"
+    tabindex="0"
+    aria-label="Close modal backdrop"
+    on:click={handleBackdropClick}
+    on:keydown={handleModalBackdropKeydown}
+  >
+    <div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-background p-4" role="dialog" aria-modal="true">
       {#if modalLoading}
         <div class="text-sm text-muted-foreground">Loading test details…</div>
       {:else if !selectedTestDetails}
@@ -293,8 +320,19 @@
         </div>
 
         <div class="mt-4 flex items-center justify-between">
-          <a class="text-sm text-blue-500 underline" href={selectedTestDetails.pdfUrl} target="_blank" rel="noreferrer">Open PDF</a>
-          <button type="button" class="rounded border border-border px-3 py-1" on:click={closeModal}>Close</button>
+          {#if selectedTestDetails.test?.pdfFile && pdfHrefFor(selectedTestDetails)}
+            <a
+              class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/40"
+              href={pdfHrefFor(selectedTestDetails)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open PDF
+            </a>
+          {:else}
+            <button type="button" class="rounded border border-border px-3 py-1 text-sm text-muted-foreground disabled:opacity-60" disabled>Open PDF</button>
+          {/if}
+          <button type="button" class="rounded border border-border px-3 py-1 text-foreground hover:bg-muted/40" on:click={closeModal}>Close</button>
         </div>
       {/if}
     </div>
