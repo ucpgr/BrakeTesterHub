@@ -128,18 +128,6 @@ void LptRepository::initializeSchema() const {
     }
   }
 
-  sqlite3_exec(m_DatabaseHandle, "ALTER TABLE tests ADD COLUMN created_at_utc TEXT", nullptr, nullptr, nullptr);
-  sqlite3_exec(m_DatabaseHandle, "ALTER TABLE tests ADD COLUMN prnFile TEXT", nullptr, nullptr, nullptr);
-  sqlite3_exec(m_DatabaseHandle, "ALTER TABLE tests ADD COLUMN pdfFile TEXT", nullptr, nullptr, nullptr);
-  sqlite3_exec(m_DatabaseHandle, "ALTER TABLE tests ADD COLUMN outcome TEXT NOT NULL DEFAULT 'unknown'", nullptr, nullptr, nullptr);
-  sqlite3_exec(m_DatabaseHandle, "ALTER TABLE tests ADD COLUMN historical_vehicle_id INTEGER", nullptr, nullptr, nullptr);
-
-  sqlite3_exec(m_DatabaseHandle,
-               "UPDATE tests SET created_at_utc = datetime('now') WHERE created_at_utc IS NULL",
-               nullptr,
-               nullptr,
-               nullptr);
-
   sqlite3_exec(m_DatabaseHandle,
                "INSERT INTO history_preferences (id, results_per_page) VALUES (1, 20) "
                "ON CONFLICT(id) DO NOTHING",
@@ -322,6 +310,7 @@ HistoricalFilterOptions LptRepository::buildFilterOptions(const HistoricalTestQu
       options.years.push_back(sqlite3_column_int(yearStatement, 0));
     }
   }
+}
 
   std::string monthSql =
       "SELECT DISTINCT CAST(strftime('%m', tests.created_at_utc) AS INTEGER) AS month_value "
