@@ -21,6 +21,7 @@
 
   let modalOpen = false;
   let modalLoading = false;
+  let selectedTestSummary = null;
   let selectedTestDetails = null;
 
   function formatDateTime(utcText) {
@@ -88,13 +89,14 @@
     }
   }
 
-  async function openDetails(testId) {
+  async function openDetails(test) {
     modalOpen = true;
     modalLoading = true;
+    selectedTestSummary = test ?? null;
     selectedTestDetails = null;
 
     try {
-      const response = await fetch(`/api/history/${testId}`);
+      const response = await fetch(`/api/history/${test.id}`);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -110,6 +112,7 @@
 
   function closeModal() {
     modalOpen = false;
+    selectedTestSummary = null;
     selectedTestDetails = null;
   }
 
@@ -136,10 +139,8 @@
     loadHistory();
   }
 
-  function pdfHrefFor(details) {
-    if (!details) return '';
-    if (details.pdfUrl) return details.pdfUrl;
-    const testId = details.test?.id;
+  function pdfHrefForTest(test) {
+    const testId = test?.id;
     return testId ? `/api/history/${testId}/pdf` : '';
   }
 
@@ -218,7 +219,7 @@
     {:else}
       <div class="space-y-2">
         {#each tests as test}
-          <button type="button" class="flex w-full items-center gap-3 rounded-md border border-border bg-background p-3 text-left hover:bg-muted/40" on:click={() => openDetails(test.id)}>
+          <button type="button" class="flex w-full items-center gap-3 rounded-md border border-border bg-background p-3 text-left hover:bg-muted/40" on:click={() => openDetails(test)}>
             <div class="h-[100px] w-[100px] shrink-0 rounded border border-border bg-white"></div>
             <div class="min-w-0 flex-1 space-y-1">
               <div class="text-sm font-semibold {test.vehicle?.reg ? 'text-foreground' : 'text-muted-foreground'}">{test.vehicle?.reg || 'NA'}</div>
@@ -270,8 +271,8 @@
         </div>
       {:else}
         <div class="mb-4">
-          <h2 class="text-lg font-semibold">{selectedTestDetails.test?.vehicle?.reg || 'NA'}</h2>
-          <p class="text-sm text-muted-foreground">{formatDateTime(selectedTestDetails.test?.createdAtUtc)}</p>
+          <h2 class="text-lg font-semibold">{selectedTestDetails.test?.vehicle?.reg || selectedTestSummary?.vehicle?.reg || 'NA'}</h2>
+          <p class="text-sm text-muted-foreground">{formatDateTime(selectedTestDetails.test?.createdAtUtc || selectedTestSummary?.createdAtUtc)}</p>
         </div>
 
         <div class="overflow-x-auto">
@@ -321,10 +322,10 @@
       {/if}
 
       <div class="mt-4 flex items-center justify-between border-t border-border pt-3">
-        {#if pdfHrefFor(selectedTestDetails)}
+        {#if selectedTestSummary?.pdfFile && pdfHrefForTest(selectedTestSummary)}
           <a
             class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/40"
-            href={pdfHrefFor(selectedTestDetails)}
+            href={pdfHrefForTest(selectedTestSummary)}
             target="_blank"
             rel="noreferrer"
           >
