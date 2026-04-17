@@ -23,6 +23,8 @@
   let modalLoading = false;
   let selectedTestSummary = null;
   let selectedTestDetails = null;
+  const thumbnailHeightPx = 100;
+  const thumbnailWidthPx = Math.round(thumbnailHeightPx / Math.SQRT2);
 
   function formatDateTime(utcText) {
     if (!utcText) return 'Unknown date';
@@ -149,6 +151,16 @@
     return normalized.startsWith('/') ? normalized : `/${normalized}`;
   }
 
+  function thumbnailHrefForTest(test) {
+    const rawPath = test?.thumbnailFile;
+    if (!rawPath) return '';
+    const normalized = String(rawPath).replaceAll('\\', '/');
+    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+      return normalized;
+    }
+    return normalized.startsWith('/') ? normalized : `/${normalized}`;
+  }
+
   function handleModalBackdropKeydown(event) {
     if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -225,7 +237,21 @@
       <div class="space-y-2">
         {#each tests as test}
           <button type="button" class="flex w-full items-center gap-3 rounded-md border border-border bg-background p-3 text-left hover:bg-muted/40" on:click={() => openDetails(test)}>
-            <div class="h-[100px] w-[100px] shrink-0 rounded border border-border bg-white"></div>
+            {#if thumbnailHrefForTest(test)}
+              <img
+                src={thumbnailHrefForTest(test)}
+                alt="Test report thumbnail"
+                class="shrink-0 rounded border border-border bg-white object-contain"
+                style={`height: ${thumbnailHeightPx}px; width: ${thumbnailWidthPx}px;`}
+                loading="lazy"
+              />
+            {:else}
+              <div
+                class="shrink-0 rounded border border-border bg-white"
+                style={`height: ${thumbnailHeightPx}px; width: ${thumbnailWidthPx}px;`}
+                aria-label="No thumbnail available"
+              ></div>
+            {/if}
             <div class="min-w-0 flex-1 space-y-1">
               <div class="text-sm font-semibold {test.vehicle?.reg ? 'text-foreground' : 'text-muted-foreground'}">{test.vehicle?.reg || 'NA'}</div>
               <div class="text-xs text-muted-foreground">{formatDateTime(test.createdAtUtc)}</div>
