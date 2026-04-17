@@ -221,8 +221,8 @@
     {:else}
       <div class="space-y-2">
         {#each tests as test}
-          <div class="grid w-full gap-4 rounded-md border border-border bg-background p-3 md:grid-cols-[170px_1fr]" data-testid={`history-row-${test.id}`}>
-            <div class="space-y-2" data-testid={`history-meta-${test.id}`}>
+          <div class="grid w-full gap-4 rounded-md border border-border bg-background p-3 md:grid-cols-[270px_1fr]" data-testid={`history-row-${test.id}`}>
+            <div class="flex items-start gap-3" data-testid={`history-meta-${test.id}`}>
               {#if thumbnailHrefForTest(test)}
                 <a
                   href={thumbnailHrefForTest(test)}
@@ -248,22 +248,24 @@
                 ></div>
               {/if}
 
-              <div class="text-sm font-semibold {test.vehicle?.reg ? 'text-foreground' : 'text-muted-foreground'}">{test.vehicle?.reg || 'NA'}</div>
-              <div class="text-xs text-muted-foreground">{formatDateTime(test.createdAtUtc)}</div>
-              {#if test.pdfFile && pdfHrefForTest(test)}
-                <a
-                  class="inline-flex w-fit rounded border border-border px-2 py-1 text-xs text-foreground hover:bg-muted/40"
-                  href={pdfHrefForTest(test)}
-                  target="_blank"
-                  rel="noreferrer"
-                  data-testid={`history-pdf-${test.id}`}
-                >
-                  Open PDF
-                </a>
-              {:else}
-                <span class="inline-flex w-fit rounded border border-border px-2 py-1 text-xs text-muted-foreground">PDF unavailable</span>
-              {/if}
-              <div class="text-sm font-medium {statusClass(test.outcome)}">{statusLabel(test.outcome)}</div>
+              <div class="min-w-0 space-y-2">
+                <div class="text-sm font-semibold {test.vehicle?.reg ? 'text-foreground' : 'text-muted-foreground'}">{test.vehicle?.reg || 'NA'}</div>
+                <div class="text-xs text-muted-foreground">{formatDateTime(test.createdAtUtc)}</div>
+                {#if test.pdfFile && pdfHrefForTest(test)}
+                  <a
+                    class="inline-flex w-fit rounded border border-border px-2 py-1 text-xs text-foreground hover:bg-muted/40"
+                    href={pdfHrefForTest(test)}
+                    target="_blank"
+                    rel="noreferrer"
+                    data-testid={`history-pdf-${test.id}`}
+                  >
+                    Open PDF
+                  </a>
+                {:else}
+                  <span class="inline-flex w-fit rounded border border-border px-2 py-1 text-xs text-muted-foreground">PDF unavailable</span>
+                {/if}
+                <div class="text-sm font-medium {statusClass(test.outcome)}">{statusLabel(test.outcome)}</div>
+              </div>
             </div>
 
             <div class="min-w-0 space-y-3" data-testid={`history-inline-details-${test.id}`}>
