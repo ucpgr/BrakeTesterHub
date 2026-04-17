@@ -140,8 +140,13 @@
   }
 
   function pdfHrefForTest(test) {
-    const testId = test?.id;
-    return testId ? `/api/history/${testId}/pdf` : '';
+    const rawPath = test?.pdfFile;
+    if (!rawPath) return '';
+    const normalized = String(rawPath).replaceAll('\\', '/');
+    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+      return normalized;
+    }
+    return normalized.startsWith('/') ? normalized : `/${normalized}`;
   }
 
   function handleModalBackdropKeydown(event) {
