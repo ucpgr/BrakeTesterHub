@@ -310,6 +310,7 @@ HistoricalFilterOptions LptRepository::buildFilterOptions(const HistoricalTestQu
       options.years.push_back(sqlite3_column_int(yearStatement, 0));
     }
   }
+}
 
   std::string monthSql =
       "SELECT DISTINCT CAST(strftime('%m', tests.created_at_utc) AS INTEGER) AS month_value "
