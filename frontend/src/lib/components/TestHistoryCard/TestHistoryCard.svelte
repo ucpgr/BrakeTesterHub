@@ -7,7 +7,6 @@
   const thumbnailWidthPx = Math.round(thumbnailHeightPx / Math.SQRT2);
   const detailColumnsClass =
     'grid-cols-[56px_1.55fr_.9fr_.9fr_.9fr_1.55fr_.9fr_.9fr_.9fr]';
-  const minimumDetailRowsPerCard = 3;
 
   let loading = false;
   let errorText = '';
@@ -80,10 +79,6 @@
     const merged = Array.from(byAxle.values()).sort(
       (a, b) => (Number(a.axleIndex) || 0) - (Number(b.axleIndex) || 0)
     );
-    while (merged.length < minimumDetailRowsPerCard) {
-      merged.push({ axleIndex: '', service: null, handbrake: null });
-    }
-
     return merged;
   }
 
@@ -250,7 +245,7 @@
       <div class="text-sm text-muted-foreground">No tests found.</div>
     {:else}
       <div class="space-y-2">
-        <div class="hidden md:grid md:grid-cols-[270px_1fr]">
+        <div class="hidden md:grid md:grid-cols-[270px_1fr] md:gap-4 md:px-3">
           <div></div>
           <div class="min-w-0">
             <div class="border-x border-t border-border/70 bg-muted/40" data-testid="history-inline-shared-header">
@@ -325,20 +320,34 @@
             </div>
 
             <div class="min-w-0 self-stretch" data-testid={`history-inline-details-${test.id}`}>
-              <div class="grid h-full auto-rows-fr text-xs sm:text-sm">
+              <div class="relative h-full min-h-[100px] text-xs sm:text-sm">
+                <div class={`pointer-events-none absolute inset-0 grid ${detailColumnsClass} border-x border-border/70`}>
+                  <div class="border-r border-border/70"></div>
+                  <div class="border-r border-border/70"></div>
+                  <div class="border-r border-border/70"></div>
+                  <div class="border-r border-border/70"></div>
+                  <div class="border-r-2 border-border"></div>
+                  <div class="border-r border-border/70"></div>
+                  <div class="border-r border-border/70"></div>
+                  <div class="border-r border-border/70"></div>
+                  <div></div>
+                </div>
+
+                <div class="relative z-10 space-y-1 px-0 py-1">
                 {#each detailRowsForTest(detailsByTestId[test.id]) as row}
-                  <div class={`grid ${detailColumnsClass} h-full border-x border-b border-border/70`}>
-                    <div class="border-r border-border/70 px-2 py-1 align-top font-medium">{withDefault(row.axleIndex, '')}</div>
-                    <div class="border-r border-border/70 px-2 py-1 align-top">{row.service ? formatBrakeForce(row.service) : ''}</div>
-                    <div class="border-r border-border/70 px-2 py-1 align-top">{row.service ? withDefault(row.service.efficiency, '') : ''}</div>
-                    <div class="border-r border-border/70 px-2 py-1 align-top">{row.service ? withDefault(row.service.imbalance, '') : ''}</div>
-                    <div class="border-r-2 border-border px-2 py-1 align-top">{row.service ? withDefault(row.service.weight, '') : ''}</div>
-                    <div class="border-r border-border/70 px-2 py-1 align-top">{row.handbrake ? formatBrakeForce(row.handbrake) : ''}</div>
-                    <div class="border-r border-border/70 px-2 py-1 align-top">{row.handbrake ? withDefault(row.handbrake.efficiency, '') : ''}</div>
-                    <div class="border-r border-border/70 px-2 py-1 align-top">{row.handbrake ? withDefault(row.handbrake.imbalance, '') : ''}</div>
+                  <div class={`grid ${detailColumnsClass}`}>
+                    <div class="px-2 py-1 align-top font-medium">{withDefault(row.axleIndex, '')}</div>
+                    <div class="px-2 py-1 align-top">{row.service ? formatBrakeForce(row.service) : ''}</div>
+                    <div class="px-2 py-1 align-top">{row.service ? withDefault(row.service.efficiency, '') : ''}</div>
+                    <div class="px-2 py-1 align-top">{row.service ? withDefault(row.service.imbalance, '') : ''}</div>
+                    <div class="px-2 py-1 align-top">{row.service ? withDefault(row.service.weight, '') : ''}</div>
+                    <div class="px-2 py-1 align-top">{row.handbrake ? formatBrakeForce(row.handbrake) : ''}</div>
+                    <div class="px-2 py-1 align-top">{row.handbrake ? withDefault(row.handbrake.efficiency, '') : ''}</div>
+                    <div class="px-2 py-1 align-top">{row.handbrake ? withDefault(row.handbrake.imbalance, '') : ''}</div>
                     <div class="px-2 py-1 align-top">{row.handbrake ? withDefault(row.handbrake.weight, '') : ''}</div>
                   </div>
                 {/each}
+                </div>
               </div>
             </div>
           </div>
