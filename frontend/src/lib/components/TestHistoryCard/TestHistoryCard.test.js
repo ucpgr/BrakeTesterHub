@@ -97,9 +97,13 @@ describe('TestHistoryCard inline details layout', () => {
     await screen.findByTestId('history-inline-details-11');
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByText('Service')).toBeInTheDocument();
-    expect(screen.getByText('Handbrake')).toBeInTheDocument();
+    const sharedHeader = screen.getByTestId('history-inline-shared-header');
+    expect(sharedHeader).toBeInTheDocument();
+    expect(within(sharedHeader).getByText('Service')).toBeInTheDocument();
+    expect(within(sharedHeader).getByText('Handbrake')).toBeInTheDocument();
+    expect(within(sharedHeader).getAllByText('Brake Force')).toHaveLength(2);
     expect(screen.getByText('120 / 118')).toBeInTheDocument();
+    expect(screen.queryByText('No inline details available.')).not.toBeInTheDocument();
 
     await fireEvent.click(screen.getByTestId('history-row-11'));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
