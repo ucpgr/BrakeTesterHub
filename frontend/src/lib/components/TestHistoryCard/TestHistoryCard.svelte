@@ -7,6 +7,7 @@
   const thumbnailWidthPx = Math.round(thumbnailHeightPx / Math.SQRT2);
   const detailColumnsClass =
     'grid-cols-[56px_1.55fr_.9fr_.9fr_.9fr_1.55fr_.9fr_.9fr_.9fr]';
+  const minimumDetailRowsPerCard = 3;
 
   let loading = false;
   let errorText = '';
@@ -79,7 +80,11 @@
     const merged = Array.from(byAxle.values()).sort(
       (a, b) => (Number(a.axleIndex) || 0) - (Number(b.axleIndex) || 0)
     );
-    return merged.length ? merged : [{ axleIndex: '', service: null, handbrake: null }];
+    while (merged.length < minimumDetailRowsPerCard) {
+      merged.push({ axleIndex: '', service: null, handbrake: null });
+    }
+
+    return merged;
   }
 
   async function fetchDetailsForTests(historyTests) {
