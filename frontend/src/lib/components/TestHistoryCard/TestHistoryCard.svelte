@@ -6,7 +6,7 @@
   const thumbnailHeightPx = 100;
   const thumbnailWidthPx = Math.round(thumbnailHeightPx / Math.SQRT2);
   const detailColumnsClass =
-    'grid-cols-[56px_minmax(0,1.4fr)_90px_90px_90px_minmax(0,1.4fr)_90px_90px_90px]';
+    'grid-cols-[56px_1.55fr_.9fr_.9fr_.9fr_1.55fr_.9fr_.9fr_.9fr]';
 
   let loading = false;
   let errorText = '';
@@ -247,20 +247,24 @@
       <div class="space-y-2">
         <div class="hidden md:grid md:grid-cols-[270px_1fr]">
           <div></div>
-          <div class="min-w-0 overflow-x-auto">
-            <div
-              class={`grid min-w-[920px] ${detailColumnsClass} border-x border-t border-border/70 bg-muted/40 text-xs font-semibold text-muted-foreground sm:text-sm`}
-              data-testid="history-inline-shared-header"
-            >
-              <div class="border-b border-r border-border/70 px-2 py-1">Axle</div>
-              <div class="border-b border-r border-border/70 px-2 py-1">Service Force</div>
-              <div class="border-b border-r border-border/70 px-2 py-1">Svc Eff</div>
-              <div class="border-b border-r border-border/70 px-2 py-1">Svc Imb</div>
-              <div class="border-b border-r border-border/70 px-2 py-1">Svc Wt</div>
-              <div class="border-b border-r border-border/70 px-2 py-1">Handbrake Force</div>
-              <div class="border-b border-r border-border/70 px-2 py-1">HB Eff</div>
-              <div class="border-b border-r border-border/70 px-2 py-1">HB Imb</div>
-              <div class="border-b px-2 py-1">HB Wt</div>
+          <div class="min-w-0">
+            <div class="border-x border-t border-border/70 bg-muted/40" data-testid="history-inline-shared-header">
+              <div class={`grid ${detailColumnsClass} border-b border-border/70 text-muted-foreground`}>
+                <div class="border-r border-border/70 px-2 py-1"></div>
+                <div class="col-span-4 border-r-2 border-border px-2 py-1 text-center text-[1.9rem] font-semibold leading-tight">Service</div>
+                <div class="col-span-4 px-2 py-1 text-center text-[1.9rem] font-semibold leading-tight">Handbrake</div>
+              </div>
+              <div class={`grid ${detailColumnsClass} border-b border-border/70 text-xs font-semibold text-muted-foreground sm:text-sm`}>
+                <div class="border-r border-border/70 px-2 py-1">Axle #</div>
+                <div class="border-r border-border/70 px-2 py-1">Brake Force</div>
+                <div class="border-r border-border/70 px-2 py-1">Efficiency</div>
+                <div class="border-r border-border/70 px-2 py-1">Imbalance</div>
+                <div class="border-r-2 border-border px-2 py-1">Weight</div>
+                <div class="border-r border-border/70 px-2 py-1">Brake Force</div>
+                <div class="border-r border-border/70 px-2 py-1">Efficiency</div>
+                <div class="border-r border-border/70 px-2 py-1">Imbalance</div>
+                <div class="px-2 py-1">Weight</div>
+              </div>
             </div>
           </div>
         </div>
@@ -315,29 +319,15 @@
               </div>
             </div>
 
-            <div class="min-w-0 overflow-x-auto" data-testid={`history-inline-details-${test.id}`}>
-              <div class="md:hidden">
-                <div class={`grid min-w-[920px] ${detailColumnsClass} border-x border-t border-border/70 bg-muted/40 text-xs font-semibold text-muted-foreground sm:text-sm`}>
-                  <div class="border-b border-r border-border/70 px-2 py-1">Axle</div>
-                  <div class="border-b border-r border-border/70 px-2 py-1">Service Force</div>
-                  <div class="border-b border-r border-border/70 px-2 py-1">Svc Eff</div>
-                  <div class="border-b border-r border-border/70 px-2 py-1">Svc Imb</div>
-                  <div class="border-b border-r border-border/70 px-2 py-1">Svc Wt</div>
-                  <div class="border-b border-r border-border/70 px-2 py-1">Handbrake Force</div>
-                  <div class="border-b border-r border-border/70 px-2 py-1">HB Eff</div>
-                  <div class="border-b border-r border-border/70 px-2 py-1">HB Imb</div>
-                  <div class="border-b px-2 py-1">HB Wt</div>
-                </div>
-              </div>
-
-              <div class="min-w-[920px] text-xs sm:text-sm">
-                {#each detailRowsForTest(detailsByTestId[test.id]) as row, index}
-                  <div class={`grid ${detailColumnsClass} border-x border-b border-border/70 ${index === 0 ? 'md:border-t-0' : ''}`}>
+            <div class="min-w-0" data-testid={`history-inline-details-${test.id}`}>
+              <div class="text-xs sm:text-sm">
+                {#each detailRowsForTest(detailsByTestId[test.id]) as row}
+                  <div class={`grid ${detailColumnsClass} border-x border-b border-border/70`}>
                     <div class="border-r border-border/70 px-2 py-1 align-top font-medium">{withDefault(row.axleIndex, '')}</div>
                     <div class="border-r border-border/70 px-2 py-1 align-top">{row.service ? formatBrakeForce(row.service) : ''}</div>
                     <div class="border-r border-border/70 px-2 py-1 align-top">{row.service ? withDefault(row.service.efficiency, '') : ''}</div>
                     <div class="border-r border-border/70 px-2 py-1 align-top">{row.service ? withDefault(row.service.imbalance, '') : ''}</div>
-                    <div class="border-r border-border/70 px-2 py-1 align-top">{row.service ? withDefault(row.service.weight, '') : ''}</div>
+                    <div class="border-r-2 border-border px-2 py-1 align-top">{row.service ? withDefault(row.service.weight, '') : ''}</div>
                     <div class="border-r border-border/70 px-2 py-1 align-top">{row.handbrake ? formatBrakeForce(row.handbrake) : ''}</div>
                     <div class="border-r border-border/70 px-2 py-1 align-top">{row.handbrake ? withDefault(row.handbrake.efficiency, '') : ''}</div>
                     <div class="border-r border-border/70 px-2 py-1 align-top">{row.handbrake ? withDefault(row.handbrake.imbalance, '') : ''}</div>
