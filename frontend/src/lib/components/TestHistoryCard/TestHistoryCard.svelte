@@ -324,10 +324,10 @@
               </div>
             </div>
 
-            <div class="min-w-0" data-testid={`history-inline-details-${test.id}`}>
-              <div class="text-xs sm:text-sm">
+            <div class="min-w-0 self-stretch" data-testid={`history-inline-details-${test.id}`}>
+              <div class="grid h-full auto-rows-fr text-xs sm:text-sm">
                 {#each detailRowsForTest(detailsByTestId[test.id]) as row}
-                  <div class={`grid ${detailColumnsClass} border-x border-b border-border/70`}>
+                  <div class={`grid ${detailColumnsClass} h-full border-x border-b border-border/70`}>
                     <div class="border-r border-border/70 px-2 py-1 align-top font-medium">{withDefault(row.axleIndex, '')}</div>
                     <div class="border-r border-border/70 px-2 py-1 align-top">{row.service ? formatBrakeForce(row.service) : ''}</div>
                     <div class="border-r border-border/70 px-2 py-1 align-top">{row.service ? withDefault(row.service.efficiency, '') : ''}</div>
