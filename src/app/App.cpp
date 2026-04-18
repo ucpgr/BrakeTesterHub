@@ -110,6 +110,7 @@ App::App(std::string databasePath) {
 
   auto listener = std::make_unique<LptListener>(*m_SettingsRepository, *m_LptStore, m_Log);
   auto patcher = std::make_unique<PrnPatcher>(*m_SelectedVehicleStore, m_Log);
+  auto prnValidator = std::make_unique<PrnValidator>(m_Log);
   patcher->addPatch(0x2671, [this](const VehicleSelection&) { // userLine1 length 34
     return m_LptStore->isLptTestEnabled() ? std::string("TEST") : std::string();
   });
@@ -152,24 +153,27 @@ App::App(std::string databasePath) {
     return formatCurrentUtc("%H:%M:%S");
   });
 
+  CupsPrinterClient cupsPrinterClient(m_Log);
+  m_PrintManager = std::make_unique<PrintManager>(std::move(cupsPrinterClient),
+                                                  *m_PrintSettingsRepository,
+                                                  *m_PrintStatusStore,
+                                                  m_Log);
+
   auto renderer = std::make_unique<PrnRenderer>(m_Log);
   auto prnWriter = std::make_unique<PrnWriter>(".", m_Log);
 
   m_LptManager = std::make_unique<LptManager>(std::move(listener),
                                               std::move(patcher),
+                                              std::move(prnValidator),
                                               std::move(renderer),
                                               std::move(prnWriter),
                                               *m_LptRepository,
                                               *m_SelectedVehicleStore,
                                               *m_LptStore,
                                               *m_SettingsRepository,
+                                              *m_PrintSettingsRepository,
+                                              *m_PrintManager,
                                               m_Log);
-
-  CupsPrinterClient cupsPrinterClient(m_Log);
-  m_PrintManager = std::make_unique<PrintManager>(std::move(cupsPrinterClient),
-                                                  *m_PrintSettingsRepository,
-                                                  *m_PrintStatusStore,
-                                                  m_Log);
 
   m_HttpServer = std::make_unique<BrakeTesterHttpServer>(
       *m_LptStore,
@@ -197,8 +201,8 @@ void App::run() {
   if (m_Log) {
     m_Log->information("[App Info]: Starting runtime modules.");
   }
-  m_LptManager->start();
   m_PrintManager->start();
+  m_LptManager->start();
   m_HttpServer->start();
   startSerialDeviceRefreshLoop();
   if (m_Log) {

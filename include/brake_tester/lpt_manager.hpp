@@ -1,8 +1,10 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <thread>
 
@@ -11,16 +13,21 @@
 
 namespace brake_tester {
 
+class PrintManager;
+
 class LptManager {
 public:
   LptManager(std::unique_ptr<ILptListener> listener,
              std::unique_ptr<IPrnPatcher> patcher,
+             std::unique_ptr<IPrnValidator> prnValidator,
              std::unique_ptr<IPrnRenderer> renderer,
              std::unique_ptr<IPrnWriter> prnWriter,
              ILptRepository& lptRepository,
              ISelectedVehicleStore& selectedVehicleStore,
              ILptStore& lptStore,
              const ISettingsRepository& settingsRepository,
+             IPrintSettingsRepository& printSettingsRepository,
+             PrintManager& printManager,
              SharedLogger log);
   ~LptManager();
 
@@ -38,13 +45,18 @@ private:
 
   std::unique_ptr<ILptListener> m_Listener;
   std::unique_ptr<IPrnPatcher> m_Patcher;
+  std::unique_ptr<IPrnValidator> m_PrnValidator;
   std::unique_ptr<IPrnRenderer> m_Renderer;
   std::unique_ptr<IPrnWriter> m_PrnWriter;
   ILptRepository& m_LptRepository;
   ISelectedVehicleStore& m_SelectedVehicleStore;
   ILptStore& m_LptStore;
   const ISettingsRepository& m_SettingsRepository;
+  IPrintSettingsRepository& m_PrintSettingsRepository;
+  PrintManager& m_PrintManager;
   SharedLogger m_Log;
+  std::optional<std::chrono::steady_clock::time_point> m_SelectedVehicleUnassignDeadline;
+  mutable std::mutex m_SelectedVehicleUnassignMutex;
 };
 
 } // namespace brake_tester

@@ -1,4 +1,5 @@
 #include "brake_tester/lpt_manager.hpp"
+#include "brake_tester/print_manager.hpp"
 
 #include <chrono>
 #include <cstdlib>
@@ -31,22 +32,31 @@ std::string currentUtcIsoDateTime() {
 
 LptManager::LptManager(std::unique_ptr<ILptListener> listener,
                        std::unique_ptr<IPrnPatcher> patcher,
+                       std::unique_ptr<IPrnValidator> prnValidator,
                        std::unique_ptr<IPrnRenderer> renderer,
                        std::unique_ptr<IPrnWriter> prnWriter,
                        ILptRepository& lptRepository,
                        ISelectedVehicleStore& selectedVehicleStore,
                        ILptStore& lptStore,
                        const ISettingsRepository& settingsRepository,
+                       IPrintSettingsRepository& printSettingsRepository,
+                       PrintManager& printManager,
                        SharedLogger log)
     : m_Listener(std::move(listener)),
       m_Patcher(std::move(patcher)),
+      m_PrnValidator(std::move(prnValidator)),
       m_Renderer(std::move(renderer)),
       m_PrnWriter(std::move(prnWriter)),
       m_LptRepository(lptRepository),
       m_SelectedVehicleStore(selectedVehicleStore),
       m_LptStore(lptStore),
       m_SettingsRepository(settingsRepository),
+      m_PrintSettingsRepository(printSettingsRepository),
+      m_PrintManager(printManager),
       m_Log(std::move(log)) {
+  if (!m_PrnValidator) {
+    throw std::invalid_argument("LptManager requires a valid PrnValidator");
+  }
   if (m_Log) {
     m_Log->information("[LptManager Info]: Constructed.");
   }
@@ -76,6 +86,18 @@ void LptManager::start() {
   m_WorkerThread = std::thread([this] {
     while (m_IsRunning) {
       try {
+        {
+          std::scoped_lock lock(m_SelectedVehicleUnassignMutex);
+          if (m_SelectedVehicleUnassignDeadline.has_value() &&
+              std::chrono::steady_clock::now() >= *m_SelectedVehicleUnassignDeadline) {
+            m_SelectedVehicleStore.setSelectedVehicle({});
+            m_SelectedVehicleUnassignDeadline.reset();
+            if (m_Log) {
+              m_Log->information("[LptManager Info]: Vehicle selection reset to unassigned after timeout.");
+            }
+          }
+        }
+
         auto incomingBytes = m_Listener->captureTransmission(m_IsRunning);
         if (incomingBytes.empty()) {
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -84,6 +106,10 @@ void LptManager::start() {
         if (m_Log) {
           m_Log->information("[LptManager Info]: Data transfer started. Captured bytes: " +
                              std::to_string(incomingBytes.size()));
+        }
+
+        if (!m_PrnValidator || !m_PrnValidator->verifyTemplate(incomingBytes)) {
+          continue;
         }
 
         m_LptStore.setProcessStatus(LptProcessStatus::TransferStarted);
@@ -111,7 +137,6 @@ void LptManager::start() {
         if (m_Log) {
           m_Log->information("[LptManager Info]: Conversion finished for: " + captureFilename + ".prn");
         }
-
         const auto thumbnailFilePath = generateThumbnailForPdf(std::filesystem::path(captureFilename + ".prn.pdf"));
         if (thumbnailFilePath.has_value()) {
           m_LptStore.setProcessStatus(LptProcessStatus::ThumbnailGenerated);
@@ -141,6 +166,24 @@ void LptManager::start() {
         }
 
         m_LptRepository.createTest(historicalTest, {});
+        const PrintSettings printSettings = m_PrintSettingsRepository.getPrintSettings();
+        if (printSettings.autoPrint) {
+          const bool printStarted = m_PrintManager.printPdfFile(historicalTest.pdfFile);
+          if (m_Log) {
+            m_Log->information(std::string("[LptManager Info]: Auto print ") +
+                               (printStarted ? "started." : "failed to start."));
+          }
+        }
+
+        const int unassignMinutes = m_SettingsRepository.getVehicleUnassignMinutes();
+        {
+          std::scoped_lock lock(m_SelectedVehicleUnassignMutex);
+          m_SelectedVehicleUnassignDeadline = std::chrono::steady_clock::now() + std::chrono::minutes(unassignMinutes);
+        }
+        if (m_Log) {
+          m_Log->information("[LptManager Info]: Vehicle unassign scheduled in " + std::to_string(unassignMinutes) +
+                             " minute(s).");
+        }
       } catch (const std::exception& processingException) {
         if (m_Log) {
           m_Log->Error(processingException.what());

@@ -126,6 +126,14 @@ describe('TestHistoryCard inline details layout', () => {
     expect(relationship & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('shows a Result label before pass/fail status text', async () => {
+    render(TestHistoryCard);
+
+    const metadata = await screen.findByTestId('history-meta-11');
+    expect(within(metadata).getByText('Result:')).toBeInTheDocument();
+    expect(within(metadata).getByText('Pass')).toBeInTheDocument();
+  });
+
   it('requests per-row details during history load', async () => {
     render(TestHistoryCard);
 
