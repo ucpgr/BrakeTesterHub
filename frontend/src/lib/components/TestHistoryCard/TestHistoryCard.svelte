@@ -5,6 +5,9 @@
   const perPageOptions = Array.from({ length: 10 }, (_, index) => (index + 1) * 10);
   const thumbnailHeightPx = 100;
   const thumbnailWidthPx = Math.round(thumbnailHeightPx / Math.SQRT2);
+  const detailColumnsClass =
+    'grid-cols-[56px_1.55fr_.9fr_.9fr_.9fr_1.55fr_.9fr_.9fr_.9fr]';
+  const minimumDetailRowsPerCard = 3;
 
   let loading = false;
   let errorText = '';
@@ -55,6 +58,33 @@
   function rowsForType(details, type) {
     const rows = details?.axleResults?.filter((row) => row.testType === type) ?? [];
     return [...rows].sort((a, b) => (Number(a.axleIndex) || 0) - (Number(b.axleIndex) || 0));
+  }
+
+  function detailRowsForTest(details) {
+    const serviceRows = rowsForType(details, 'service');
+    const handbrakeRows = rowsForType(details, 'hand_brake');
+    const byAxle = new Map();
+
+    for (const row of serviceRows) {
+      byAxle.set(row.axleIndex, { axleIndex: row.axleIndex, service: row, handbrake: null });
+    }
+
+    for (const row of handbrakeRows) {
+      if (!byAxle.has(row.axleIndex)) {
+        byAxle.set(row.axleIndex, { axleIndex: row.axleIndex, service: null, handbrake: row });
+      } else {
+        byAxle.get(row.axleIndex).handbrake = row;
+      }
+    }
+
+    const merged = Array.from(byAxle.values()).sort(
+      (a, b) => (Number(a.axleIndex) || 0) - (Number(b.axleIndex) || 0)
+    );
+    while (merged.length < minimumDetailRowsPerCard) {
+      merged.push({ axleIndex: '', service: null, handbrake: null });
+    }
+
+    return merged;
   }
 
   async function fetchDetailsForTests(historyTests) {
@@ -220,6 +250,29 @@
       <div class="text-sm text-muted-foreground">No tests found.</div>
     {:else}
       <div class="space-y-2">
+        <div class="hidden md:grid md:grid-cols-[270px_1fr]">
+          <div></div>
+          <div class="min-w-0">
+            <div class="border-x border-t border-border/70 bg-muted/40" data-testid="history-inline-shared-header">
+              <div class={`grid ${detailColumnsClass} border-b border-border/70 text-muted-foreground`}>
+                <div class="border-r border-border/70 px-2 py-1"></div>
+                <div class="col-span-4 border-r-2 border-border px-2 py-1 text-center text-[1.9rem] font-semibold leading-tight">Service</div>
+                <div class="col-span-4 px-2 py-1 text-center text-[1.9rem] font-semibold leading-tight">Handbrake</div>
+              </div>
+              <div class={`grid ${detailColumnsClass} border-b border-border/70 text-xs font-semibold text-muted-foreground sm:text-sm`}>
+                <div class="border-r border-border/70 px-2 py-1">Axle #</div>
+                <div class="border-r border-border/70 px-2 py-1">Brake Force</div>
+                <div class="border-r border-border/70 px-2 py-1">Efficiency</div>
+                <div class="border-r border-border/70 px-2 py-1">Imbalance</div>
+                <div class="border-r-2 border-border px-2 py-1">Weight</div>
+                <div class="border-r border-border/70 px-2 py-1">Brake Force</div>
+                <div class="border-r border-border/70 px-2 py-1">Efficiency</div>
+                <div class="border-r border-border/70 px-2 py-1">Imbalance</div>
+                <div class="px-2 py-1">Weight</div>
+              </div>
+            </div>
+          </div>
+        </div>
         {#each tests as test}
           <div class="grid w-full gap-4 rounded-md border border-border bg-background p-3 md:grid-cols-[270px_1fr]" data-testid={`history-row-${test.id}`}>
             <div class="flex items-start gap-3" data-testid={`history-meta-${test.id}`}>
@@ -271,49 +324,22 @@
               </div>
             </div>
 
-            <div class="min-w-0 space-y-3" data-testid={`history-inline-details-${test.id}`}>
-              {#if !detailsByTestId[test.id]}
-                <div class="text-sm text-muted-foreground">No inline details available.</div>
-              {:else}
-                <div class="grid gap-3 lg:grid-cols-2">
-                  {#each [
-                    { key: 'service', label: 'Service' },
-                    { key: 'hand_brake', label: 'Handbrake' }
-                  ] as group}
-                    <section class="overflow-x-auto rounded border border-border/70">
-                      <h4 class="border-b border-border/70 bg-muted/30 px-2 py-1 text-sm font-semibold">{group.label}</h4>
-                      <table class="w-full border-collapse text-xs sm:text-sm">
-                        <thead>
-                          <tr class="border-b border-border/50 text-left">
-                            <th class="px-2 py-1">Axle</th>
-                            <th class="px-2 py-1">Brake Force</th>
-                            <th class="px-2 py-1">Efficiency</th>
-                            <th class="px-2 py-1">Imbalance</th>
-                            <th class="px-2 py-1">Weight</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {#if rowsForType(detailsByTestId[test.id], group.key).length === 0}
-                            <tr>
-                              <td class="px-2 py-2 text-muted-foreground" colspan="5">No {group.label.toLowerCase()} data.</td>
-                            </tr>
-                          {:else}
-                            {#each rowsForType(detailsByTestId[test.id], group.key) as row}
-                              <tr class="border-b border-border/40 last:border-0">
-                                <td class="px-2 py-1 align-top font-medium">{withDefault(row.axleIndex)}</td>
-                                <td class="px-2 py-1 align-top">{formatBrakeForce(row)}</td>
-                                <td class="px-2 py-1 align-top">{withDefault(row.efficiency)}</td>
-                                <td class="px-2 py-1 align-top">{withDefault(row.imbalance)}</td>
-                                <td class="px-2 py-1 align-top">{withDefault(row.weight)}</td>
-                              </tr>
-                            {/each}
-                          {/if}
-                        </tbody>
-                      </table>
-                    </section>
-                  {/each}
-                </div>
-              {/if}
+            <div class="min-w-0 self-stretch" data-testid={`history-inline-details-${test.id}`}>
+              <div class="grid h-full auto-rows-fr text-xs sm:text-sm">
+                {#each detailRowsForTest(detailsByTestId[test.id]) as row}
+                  <div class={`grid ${detailColumnsClass} h-full border-x border-b border-border/70`}>
+                    <div class="border-r border-border/70 px-2 py-1 align-top font-medium">{withDefault(row.axleIndex, '')}</div>
+                    <div class="border-r border-border/70 px-2 py-1 align-top">{row.service ? formatBrakeForce(row.service) : ''}</div>
+                    <div class="border-r border-border/70 px-2 py-1 align-top">{row.service ? withDefault(row.service.efficiency, '') : ''}</div>
+                    <div class="border-r border-border/70 px-2 py-1 align-top">{row.service ? withDefault(row.service.imbalance, '') : ''}</div>
+                    <div class="border-r-2 border-border px-2 py-1 align-top">{row.service ? withDefault(row.service.weight, '') : ''}</div>
+                    <div class="border-r border-border/70 px-2 py-1 align-top">{row.handbrake ? formatBrakeForce(row.handbrake) : ''}</div>
+                    <div class="border-r border-border/70 px-2 py-1 align-top">{row.handbrake ? withDefault(row.handbrake.efficiency, '') : ''}</div>
+                    <div class="border-r border-border/70 px-2 py-1 align-top">{row.handbrake ? withDefault(row.handbrake.imbalance, '') : ''}</div>
+                    <div class="px-2 py-1 align-top">{row.handbrake ? withDefault(row.handbrake.weight, '') : ''}</div>
+                  </div>
+                {/each}
+              </div>
             </div>
           </div>
         {/each}
