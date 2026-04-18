@@ -24,6 +24,8 @@ public:
   virtual ~ISettingsRepository() = default;
   virtual SerialSettings getSerialSettings() const = 0;
   virtual void setSerialSettings(const SerialSettings& serialSettings) = 0;
+  virtual int getVehicleUnassignMinutes() const = 0;
+  virtual void setVehicleUnassignMinutes(int minutes) = 0;
 };
 
 class ISerialDeviceStore {
@@ -112,6 +114,12 @@ class IPrnPatcher {
 public:
   virtual ~IPrnPatcher() = default;
   virtual std::vector<std::uint8_t> patch(const std::vector<std::uint8_t>& inputBytes) = 0;
+};
+
+class IPrnValidator {
+public:
+  virtual ~IPrnValidator() = default;
+  virtual bool verifyTemplate(const std::vector<std::uint8_t>& inputBytes) const = 0;
 };
 
 class IPrnRenderer {

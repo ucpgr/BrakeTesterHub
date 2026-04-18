@@ -16,10 +16,13 @@ public:
 
   SerialSettings getSerialSettings() const override;
   void setSerialSettings(const SerialSettings& serialSettings) override;
+  int getVehicleUnassignMinutes() const override;
+  void setVehicleUnassignMinutes(int minutes) override;
 
 private:
   void initializeSchema();
   void loadCachedSerialSettings();
+  static int clampVehicleUnassignMinutes(int minutes);
   std::string getSettingValueOrDefault(const std::string& settingName, const std::string& defaultValue) const;
   void upsertCachedSerialSettings() const;
   void persistSetting(sqlite3_stmt* statement, const std::string& settingName, const std::string& settingValue) const;

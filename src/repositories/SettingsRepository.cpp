@@ -23,6 +23,34 @@ SerialSettings SettingsRepository::getSerialSettings() const {
   return m_CachedSerialSettings;
 }
 
+int SettingsRepository::getVehicleUnassignMinutes() const {
+  std::scoped_lock lock(m_Mutex);
+  const std::string settingText = getSettingValueOrDefault("vehicleUnassignMinutes", "10");
+  const int configuredMinutes = std::atoi(settingText.c_str());
+  return clampVehicleUnassignMinutes(configuredMinutes);
+}
+
+void SettingsRepository::setVehicleUnassignMinutes(int minutes) {
+  std::scoped_lock lock(m_Mutex);
+  static constexpr const char* upsertSql =
+      "INSERT INTO LptSettings (name, value) VALUES (?, ?) "
+      "ON CONFLICT(name) DO UPDATE SET value = excluded.value;";
+
+  sqlite3_stmt* statement = nullptr;
+  if (sqlite3_prepare_v2(m_DatabaseHandle, upsertSql, -1, &statement, nullptr) != SQLITE_OK) {
+    throw std::runtime_error("Failed to prepare LptSettings upsert statement for vehicleUnassignMinutes");
+  }
+
+  const int clampedMinutes = clampVehicleUnassignMinutes(minutes);
+  persistSetting(statement, "vehicleUnassignMinutes", std::to_string(clampedMinutes));
+  finalizeStatement(statement);
+
+  if (m_Log) {
+    m_Log->information("[SettingsRepository Info]: Updated vehicle unassign timeout to " +
+                       std::to_string(clampedMinutes) + " minute(s).");
+  }
+}
+
 void SettingsRepository::setSerialSettings(const SerialSettings& serialSettings) {
   std::scoped_lock lock(m_Mutex);
   m_CachedSerialSettings = serialSettings;
@@ -65,6 +93,16 @@ void SettingsRepository::loadCachedSerialSettings() {
   if (m_Log) {
     m_Log->information("[SettingsRepository Info]: Loaded cached serial settings.");
   }
+}
+
+int SettingsRepository::clampVehicleUnassignMinutes(int minutes) {
+  if (minutes < 1) {
+    return 10;
+  }
+  if (minutes > 1440) {
+    return 1440;
+  }
+  return minutes;
 }
 
 std::string SettingsRepository::getSettingValueOrDefault(const std::string& settingName, const std::string& defaultValue) const {

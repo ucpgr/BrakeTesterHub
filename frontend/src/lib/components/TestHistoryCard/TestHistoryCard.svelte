@@ -248,7 +248,7 @@
                 ></div>
               {/if}
 
-              <div class="min-w-0 space-y-2">
+              <div class="min-w-0 space-y-2 text-left">
                 <div class="text-sm font-semibold {test.vehicle?.reg ? 'text-foreground' : 'text-muted-foreground'}">{test.vehicle?.reg || 'NA'}</div>
                 <div class="text-xs text-muted-foreground">{formatDateTime(test.createdAtUtc)}</div>
                 {#if test.pdfFile && pdfHrefForTest(test)}
@@ -264,7 +264,10 @@
                 {:else}
                   <span class="inline-flex w-fit rounded border border-border px-2 py-1 text-xs text-muted-foreground">PDF unavailable</span>
                 {/if}
-                <div class="text-sm font-medium {statusClass(test.outcome)}">{statusLabel(test.outcome)}</div>
+                <div class="text-sm font-medium">
+                  <span class="text-foreground">Result:</span>
+                  <span class={statusClass(test.outcome)}> {statusLabel(test.outcome)}</span>
+                </div>
               </div>
             </div>
 

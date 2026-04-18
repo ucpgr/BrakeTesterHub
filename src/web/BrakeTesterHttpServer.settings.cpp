@@ -88,6 +88,14 @@ void BrakeTesterHttpServer::configureSettingsModule() {
           }
           broadcastStatus("info", std::string("Auto print ") + (printSettings.autoPrint ? "enabled" : "disabled"));
           broadcastSettingsState();
+        } else if (action == "set_vehicle_unassign_minutes") {
+          const int minutes = payload.value("minutes", 10);
+          m_SettingsRepository.setVehicleUnassignMinutes(minutes);
+          if (m_Log) {
+            m_Log->information("[BrakeTesterHttpServer Info]: Vehicle unassign timeout updated.");
+          }
+          broadcastStatus("info", "Vehicle unassign timeout updated");
+          broadcastSettingsState();
         } else if (action == "refresh_printers") {
           if (m_Log) {
             m_Log->information("[BrakeTesterHttpServer Info]: Printer refresh requested by frontend.");
@@ -198,6 +206,7 @@ std::string BrakeTesterHttpServer::buildSettingsStatePayloadText() const {
       {"printers", printerItems},
       {"selectedPrinter", printSettings.selectedPrinter},
       {"autoPrint", printSettings.autoPrint},
+      {"vehicleUnassignMinutes", m_SettingsRepository.getVehicleUnassignMinutes()},
       {"printStatus", m_PrintStatusStore.getStatus()},
   };
   return payload.dump();
