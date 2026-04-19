@@ -116,10 +116,19 @@ void LptManager::start() {
   m_WorkerThread = std::thread([this] {
     while (m_IsRunning) {
       try {
+        const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
         {
           std::scoped_lock lock(m_SelectedVehicleUnassignMutex);
-          if (m_SelectedVehicleUnassignDeadline.has_value() &&
-              std::chrono::steady_clock::now() >= *m_SelectedVehicleUnassignDeadline) {
+          if (selectedVehicle.reg.empty()) {
+            m_SelectedVehicleUnassignDeadline.reset();
+          } else if (!m_SelectedVehicleUnassignDeadline.has_value()) {
+            const int unassignMinutes = m_SettingsRepository.getVehicleUnassignMinutes();
+            m_SelectedVehicleUnassignDeadline = std::chrono::steady_clock::now() + std::chrono::minutes(unassignMinutes);
+            if (m_Log) {
+              m_Log->information("[LptManager Info]: Vehicle unassign scheduled in " + std::to_string(unassignMinutes) +
+                                 " minute(s) due to active vehicle selection.");
+            }
+          } else if (std::chrono::steady_clock::now() >= *m_SelectedVehicleUnassignDeadline) {
             m_SelectedVehicleStore.setSelectedVehicle({});
             m_SelectedVehicleUnassignDeadline.reset();
             if (m_Log) {
@@ -198,6 +207,15 @@ bool LptManager::processCapturedPayload(const std::vector<uint8_t>& incomingByte
   if (m_Log) {
     m_Log->information("[LptManager Info]: Conversion finished for: " + captureFilename + ".prn");
   }
+  const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
+  m_SelectedVehicleStore.setSelectedVehicle({});
+  {
+    std::scoped_lock lock(m_SelectedVehicleUnassignMutex);
+    m_SelectedVehicleUnassignDeadline.reset();
+  }
+  if (m_Log) {
+    m_Log->information("[LptManager Info]: Vehicle selection reset to unassigned after successful conversion.");
+  }
   const auto thumbnailFilePath = generateThumbnailForPdf(std::filesystem::path(captureFilename + ".prn.pdf"));
   if (thumbnailFilePath.has_value()) {
     m_LptStore.setProcessStatus(LptProcessStatus::ThumbnailGenerated);
@@ -209,7 +227,6 @@ bool LptManager::processCapturedPayload(const std::vector<uint8_t>& incomingByte
     m_Log->warning("[LptManager Warning]: Thumbnail not generated for capture key '" + captureFilename + "'.");
   }
 
-  const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
   HistoricalTest historicalTest;
   historicalTest.createdAtUtc = currentUtcIsoDateTime();
   historicalTest.prnFile = captureFilename + ".prn";
@@ -253,16 +270,6 @@ bool LptManager::processCapturedPayload(const std::vector<uint8_t>& incomingByte
     if (m_Log) {
       m_Log->information(std::string("[LptManager Info]: Auto print ") + (printStarted ? "started." : "failed to start."));
     }
-  }
-
-  const int unassignMinutes = m_SettingsRepository.getVehicleUnassignMinutes();
-  {
-    std::scoped_lock lock(m_SelectedVehicleUnassignMutex);
-    m_SelectedVehicleUnassignDeadline = std::chrono::steady_clock::now() + std::chrono::minutes(unassignMinutes);
-  }
-  if (m_Log) {
-    m_Log->information("[LptManager Info]: Vehicle unassign scheduled in " + std::to_string(unassignMinutes) +
-                       " minute(s).");
   }
 
   return true;
