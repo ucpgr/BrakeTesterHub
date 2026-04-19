@@ -103,6 +103,7 @@ App::App(std::string databasePath) {
   m_VehicleRepository = std::make_unique<VehicleRepository>(m_DatabaseHandle, m_Log);
   m_PrintSettingsRepository = std::make_unique<PrintSettingsRepository>(m_DatabaseHandle, m_Log);
   m_LptRepository = std::make_unique<LptRepository>(m_DatabaseHandle, m_Log);
+  m_CurrentTestAxleDataStore = std::make_unique<CurrentTestAxleDataStore>();
   m_SelectedVehicleStore = std::make_unique<SelectedVehicleStore>();
   m_LptStore = std::make_unique<LptStore>();
   m_SerialDeviceStore = std::make_unique<SerialDeviceStore>();
@@ -168,6 +169,7 @@ App::App(std::string databasePath) {
                                               std::move(renderer),
                                               std::move(prnWriter),
                                               *m_LptRepository,
+                                              *m_CurrentTestAxleDataStore,
                                               *m_SelectedVehicleStore,
                                               *m_LptStore,
                                               *m_SettingsRepository,
