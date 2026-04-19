@@ -30,6 +30,7 @@
     let modelInput = '';
     let mileageInput = 0;
     let mileageUnitInput = 'km';
+    let prnUploadInputRef;
 
     const COMPACT_THRESHOLD = 760;
     const ICON_ONLY_THRESHOLD = 560;
@@ -124,11 +125,57 @@
         updateVehicleMileage(id, buildMileagePayload());
     }
 
+    function onTestResultsRClick(event) {
+        event.preventDefault();
+        prnUploadInputRef?.click();
+    }
+
+    async function onPrnUploadChange(event) {
+        const input = event.currentTarget;
+        const file = input?.files?.[0];
+        if (!file) return;
+
+        try {
+            const formData = new FormData();
+            formData.append('prn', file);
+
+            const response = await fetch('/api/lpt/upload-prn', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`PRN upload failed (${response.status}).`);
+            }
+        } catch (uploadError) {
+            console.error('Failed to upload PRN test result file.', uploadError);
+        } finally {
+            input.value = '';
+        }
+    }
+
 </script>
 
 <Card class="w-full" bind:ref={cardRef}>
     <CardHeader class="grid-cols-[1fr_auto] items-center gap-3 pb-4">
-        <CardTitle class="text-base">Test Results</CardTitle>
+        <CardTitle class="text-base">
+            Test
+            <a
+                href="/api/lpt/upload-prn"
+                class="appearance-none text-inherit no-underline hover:text-inherit focus:text-inherit visited:text-inherit"
+                aria-label="Upload PRN file"
+                onclick={onTestResultsRClick}
+            >
+                R
+            </a>esults
+            <input
+                bind:this={prnUploadInputRef}
+                type="file"
+                accept=".prn"
+                class="hidden"
+                onchange={onPrnUploadChange}
+            />
+        </CardTitle>
 
         <CardAction class="row-span-1 row-start-1 self-center">
             {#if iconOnlyControls}

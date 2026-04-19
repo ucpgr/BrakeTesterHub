@@ -108,82 +108,7 @@ void LptManager::start() {
                              std::to_string(incomingBytes.size()));
         }
 
-        if (!m_PrnValidator || !m_PrnValidator->verifyTemplate(incomingBytes)) {
-          continue;
-        }
-
-        m_LptStore.setProcessStatus(LptProcessStatus::TransferStarted);
-        const auto captureFilename = generateCaptureFilenameWithoutExtension();
-        m_LptStore.setCurrentCaptureFilename(captureFilename);
-        if (m_Log) {
-          m_Log->information("[LptManager Info]: Capture file key assigned: " + captureFilename);
-        }
-
-        auto patchedBytes = m_Patcher->patch(incomingBytes);
-        m_LptStore.setLptTestEnabled(false);
-        m_LptStore.setProcessStatus(LptProcessStatus::DataPatched);
-        if (m_Log) {
-          m_Log->information("[LptManager Info]: Data patched. Output bytes: " + std::to_string(patchedBytes.size()));
-        }
-
-        m_PrnWriter->writePrn(patchedBytes, captureFilename);
-
-        m_LptStore.setProcessStatus(LptProcessStatus::ConversionStarted);
-        if (m_Log) {
-          m_Log->information("[LptManager Info]: Conversion started for: " + captureFilename + ".prn");
-        }
-        m_Renderer->render(std::filesystem::path(captureFilename).concat(".prn"));
-        m_LptStore.setProcessStatus(LptProcessStatus::ConversionFinished);
-        if (m_Log) {
-          m_Log->information("[LptManager Info]: Conversion finished for: " + captureFilename + ".prn");
-        }
-        const auto thumbnailFilePath = generateThumbnailForPdf(std::filesystem::path(captureFilename + ".prn.pdf"));
-        if (thumbnailFilePath.has_value()) {
-          m_LptStore.setProcessStatus(LptProcessStatus::ThumbnailGenerated);
-          if (m_Log) {
-            m_Log->information("[LptManager Info]: Thumbnail generated for capture key '" + captureFilename +
-                               "' at path: " + *thumbnailFilePath);
-          }
-        } else if (m_Log) {
-          m_Log->warning("[LptManager Warning]: Thumbnail not generated for capture key '" + captureFilename + "'.");
-        }
-
-        const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
-        HistoricalTest historicalTest;
-        historicalTest.createdAtUtc = currentUtcIsoDateTime();
-        historicalTest.prnFile = captureFilename + ".prn";
-        historicalTest.pdfFile = captureFilename + ".prn.pdf";
-        historicalTest.thumbnailFile = thumbnailFilePath;
-        historicalTest.outcome = TestOutcome::Unknown;
-
-        if (!selectedVehicle.reg.empty()) {
-          HistoricalVehicle historicalVehicle;
-          historicalVehicle.reg = selectedVehicle.reg;
-          historicalVehicle.make = selectedVehicle.make.empty() ? std::nullopt : std::optional<std::string>(selectedVehicle.make);
-          historicalVehicle.model = selectedVehicle.model.empty() ? std::nullopt : std::optional<std::string>(selectedVehicle.model);
-          historicalVehicle.mileage = selectedVehicle.mileage;
-          historicalTest.vehicle = historicalVehicle;
-        }
-
-        m_LptRepository.createTest(historicalTest, {});
-        const PrintSettings printSettings = m_PrintSettingsRepository.getPrintSettings();
-        if (printSettings.autoPrint) {
-          const bool printStarted = m_PrintManager.printPdfFile(historicalTest.pdfFile);
-          if (m_Log) {
-            m_Log->information(std::string("[LptManager Info]: Auto print ") +
-                               (printStarted ? "started." : "failed to start."));
-          }
-        }
-
-        const int unassignMinutes = m_SettingsRepository.getVehicleUnassignMinutes();
-        {
-          std::scoped_lock lock(m_SelectedVehicleUnassignMutex);
-          m_SelectedVehicleUnassignDeadline = std::chrono::steady_clock::now() + std::chrono::minutes(unassignMinutes);
-        }
-        if (m_Log) {
-          m_Log->information("[LptManager Info]: Vehicle unassign scheduled in " + std::to_string(unassignMinutes) +
-                             " minute(s).");
-        }
+        processCapturedPayload(incomingBytes);
       } catch (const std::exception& processingException) {
         if (m_Log) {
           m_Log->Error(processingException.what());
@@ -200,6 +125,97 @@ void LptManager::start() {
       }
     }
   });
+}
+
+bool LptManager::ingestPrnPayload(const std::vector<uint8_t>& incomingBytes) {
+  try {
+    return processCapturedPayload(incomingBytes);
+  } catch (const std::exception& processingException) {
+    if (m_Log) {
+      m_Log->Error(std::string("[LptManager Error]: Failed to ingest PRN payload. ") + processingException.what());
+    }
+    return false;
+  }
+}
+
+bool LptManager::processCapturedPayload(const std::vector<uint8_t>& incomingBytes) {
+  if (!m_PrnValidator || !m_PrnValidator->verifyTemplate(incomingBytes)) {
+    return false;
+  }
+
+  m_LptStore.setProcessStatus(LptProcessStatus::TransferStarted);
+  const auto captureFilename = generateCaptureFilenameWithoutExtension();
+  m_LptStore.setCurrentCaptureFilename(captureFilename);
+  if (m_Log) {
+    m_Log->information("[LptManager Info]: Capture file key assigned: " + captureFilename);
+  }
+
+  auto patchedBytes = m_Patcher->patch(incomingBytes);
+  m_LptStore.setLptTestEnabled(false);
+  m_LptStore.setProcessStatus(LptProcessStatus::DataPatched);
+  if (m_Log) {
+    m_Log->information("[LptManager Info]: Data patched. Output bytes: " + std::to_string(patchedBytes.size()));
+  }
+
+  m_PrnWriter->writePrn(patchedBytes, captureFilename);
+
+  m_LptStore.setProcessStatus(LptProcessStatus::ConversionStarted);
+  if (m_Log) {
+    m_Log->information("[LptManager Info]: Conversion started for: " + captureFilename + ".prn");
+  }
+  m_Renderer->render(std::filesystem::path(captureFilename).concat(".prn"));
+  m_LptStore.setProcessStatus(LptProcessStatus::ConversionFinished);
+  if (m_Log) {
+    m_Log->information("[LptManager Info]: Conversion finished for: " + captureFilename + ".prn");
+  }
+  const auto thumbnailFilePath = generateThumbnailForPdf(std::filesystem::path(captureFilename + ".prn.pdf"));
+  if (thumbnailFilePath.has_value()) {
+    m_LptStore.setProcessStatus(LptProcessStatus::ThumbnailGenerated);
+    if (m_Log) {
+      m_Log->information("[LptManager Info]: Thumbnail generated for capture key '" + captureFilename +
+                         "' at path: " + *thumbnailFilePath);
+    }
+  } else if (m_Log) {
+    m_Log->warning("[LptManager Warning]: Thumbnail not generated for capture key '" + captureFilename + "'.");
+  }
+
+  const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
+  HistoricalTest historicalTest;
+  historicalTest.createdAtUtc = currentUtcIsoDateTime();
+  historicalTest.prnFile = captureFilename + ".prn";
+  historicalTest.pdfFile = captureFilename + ".prn.pdf";
+  historicalTest.thumbnailFile = thumbnailFilePath;
+  historicalTest.outcome = TestOutcome::Unknown;
+
+  if (!selectedVehicle.reg.empty()) {
+    HistoricalVehicle historicalVehicle;
+    historicalVehicle.reg = selectedVehicle.reg;
+    historicalVehicle.make = selectedVehicle.make.empty() ? std::nullopt : std::optional<std::string>(selectedVehicle.make);
+    historicalVehicle.model = selectedVehicle.model.empty() ? std::nullopt : std::optional<std::string>(selectedVehicle.model);
+    historicalVehicle.mileage = selectedVehicle.mileage;
+    historicalTest.vehicle = historicalVehicle;
+  }
+
+  m_LptRepository.createTest(historicalTest, {});
+  const PrintSettings printSettings = m_PrintSettingsRepository.getPrintSettings();
+  if (printSettings.autoPrint) {
+    const bool printStarted = m_PrintManager.printPdfFile(historicalTest.pdfFile);
+    if (m_Log) {
+      m_Log->information(std::string("[LptManager Info]: Auto print ") + (printStarted ? "started." : "failed to start."));
+    }
+  }
+
+  const int unassignMinutes = m_SettingsRepository.getVehicleUnassignMinutes();
+  {
+    std::scoped_lock lock(m_SelectedVehicleUnassignMutex);
+    m_SelectedVehicleUnassignDeadline = std::chrono::steady_clock::now() + std::chrono::minutes(unassignMinutes);
+  }
+  if (m_Log) {
+    m_Log->information("[LptManager Info]: Vehicle unassign scheduled in " + std::to_string(unassignMinutes) +
+                       " minute(s).");
+  }
+
+  return true;
 }
 
 void LptManager::stop() {
