@@ -1,9 +1,12 @@
 #include "brake_tester/web/BrakeTesterHttpServer.hpp"
+#include "brake_tester/lpt_manager.hpp"
 #include "web/BrakeTesterHttpServerInternal.hpp"
 
 #include <chrono>
+#include <cstdint>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <httplib.h>
 #include <nlohmann/json.hpp>
@@ -36,6 +39,34 @@ void BrakeTesterHttpServer::configureLptModule() {
                            std::to_string(m_Impl->lptClients.size()));
       }
     }
+  });
+
+  m_Impl->server->Post("/api/lpt/upload-prn", [this](const httplib::Request& request, httplib::Response& response) {
+    if (!request.form.has_file("prn")) {
+      response.status = 400;
+      response.set_content(R"({"error":"Missing multipart field 'prn'."})", "application/json");
+      return;
+    }
+
+    const auto& uploadedFile = request.form.get_file("prn");
+    const std::string& payload = uploadedFile.content;
+    const std::vector<std::uint8_t> incomingBytes(payload.begin(), payload.end());
+
+    if (incomingBytes.empty()) {
+      response.status = 400;
+      response.set_content(R"({"error":"Uploaded PRN file is empty."})", "application/json");
+      return;
+    }
+
+    const bool processed = m_LptManager.ingestPrnPayload(incomingBytes);
+    if (!processed) {
+      response.status = 422;
+      response.set_content(R"({"error":"Uploaded PRN file did not pass validation."})", "application/json");
+      return;
+    }
+
+    response.status = 200;
+    response.set_content(R"({"ok":true})", "application/json");
   });
 }
 
