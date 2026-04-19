@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -40,12 +41,15 @@ public:
 
 private:
   bool processCapturedPayload(const std::vector<uint8_t>& incomingBytes);
+  void monitorSelectedVehicleTimeout();
+  void evaluateSelectedVehicleTimeout();
   std::optional<std::string> generateThumbnailForPdf(const std::filesystem::path& pdfPath) const;
   static std::string generateCaptureFilenameWithoutExtension();
   static std::string randomSuffix();
 
   std::atomic_bool m_IsRunning{false};
   std::thread m_WorkerThread;
+  std::thread m_SelectedVehicleWatchdogThread;
 
   std::unique_ptr<ILptListener> m_Listener;
   std::unique_ptr<IPrnPatcher> m_Patcher;
@@ -61,6 +65,7 @@ private:
   PrintManager& m_PrintManager;
   SharedLogger m_Log;
   std::optional<std::chrono::steady_clock::time_point> m_SelectedVehicleUnassignDeadline;
+  std::string m_SelectedVehicleDeadlineReg;
   mutable std::mutex m_SelectedVehicleUnassignMutex;
 };
 
