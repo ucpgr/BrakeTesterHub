@@ -24,6 +24,7 @@ public:
              std::unique_ptr<IPrnRenderer> renderer,
              std::unique_ptr<IPrnWriter> prnWriter,
              ILptRepository& lptRepository,
+             ICurrentTestAxleDataStore& currentTestAxleDataStore,
              ISelectedVehicleStore& selectedVehicleStore,
              ILptStore& lptStore,
              const ISettingsRepository& settingsRepository,
@@ -52,6 +53,7 @@ private:
   std::unique_ptr<IPrnRenderer> m_Renderer;
   std::unique_ptr<IPrnWriter> m_PrnWriter;
   ILptRepository& m_LptRepository;
+  ICurrentTestAxleDataStore& m_CurrentTestAxleDataStore;
   ISelectedVehicleStore& m_SelectedVehicleStore;
   ILptStore& m_LptStore;
   const ISettingsRepository& m_SettingsRepository;

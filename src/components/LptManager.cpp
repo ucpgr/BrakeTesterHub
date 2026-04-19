@@ -1,5 +1,6 @@
 #include "brake_tester/lpt_manager.hpp"
 #include "brake_tester/print_manager.hpp"
+#include "brake_tester/prnAnalyzer.h"
 
 #include <chrono>
 #include <cstdlib>
@@ -28,6 +29,33 @@ std::string currentUtcIsoDateTime() {
   output << std::put_time(&utcTime, "%Y-%m-%d %H:%M:%S");
   return output.str();
 }
+
+std::vector<HistoricalAxleResult> parseAxleResultsFromPrnBytes(const std::vector<uint8_t>& prnBytes) {
+  std::vector<HistoricalAxleResult> axleResults;
+  if (prnBytes.empty()) {
+    return axleResults;
+  }
+
+  const std::string prnText(prnBytes.begin(), prnBytes.end());
+  prnAnalyzer<std::string::const_iterator> analyzer(prnText.cbegin(), prnText.cend());
+  while (true) {
+    const auto nextResult = analyzer.findNextAxleResult();
+    if (!nextResult.has_value()) {
+      break;
+    }
+
+    HistoricalAxleResult historicalAxle{};
+    historicalAxle.axleIndex = static_cast<int>(nextResult->axleId);
+    historicalAxle.testType = nextResult->type == AxleResult::ResultType::Service ? "service" : "hand_brake";
+    historicalAxle.leftBrakeForce = static_cast<int>(nextResult->brakeForce.first);
+    historicalAxle.rightBrakeForce = static_cast<int>(nextResult->brakeForce.second);
+    historicalAxle.imbalance = static_cast<double>(nextResult->imbalancePct);
+    historicalAxle.weight = static_cast<int>(nextResult->weightKgs);
+    axleResults.push_back(std::move(historicalAxle));
+  }
+
+  return axleResults;
+}
 } // namespace
 
 LptManager::LptManager(std::unique_ptr<ILptListener> listener,
@@ -36,6 +64,7 @@ LptManager::LptManager(std::unique_ptr<ILptListener> listener,
                        std::unique_ptr<IPrnRenderer> renderer,
                        std::unique_ptr<IPrnWriter> prnWriter,
                        ILptRepository& lptRepository,
+                       ICurrentTestAxleDataStore& currentTestAxleDataStore,
                        ISelectedVehicleStore& selectedVehicleStore,
                        ILptStore& lptStore,
                        const ISettingsRepository& settingsRepository,
@@ -48,6 +77,7 @@ LptManager::LptManager(std::unique_ptr<ILptListener> listener,
       m_Renderer(std::move(renderer)),
       m_PrnWriter(std::move(prnWriter)),
       m_LptRepository(lptRepository),
+      m_CurrentTestAxleDataStore(currentTestAxleDataStore),
       m_SelectedVehicleStore(selectedVehicleStore),
       m_LptStore(lptStore),
       m_SettingsRepository(settingsRepository),
@@ -196,7 +226,27 @@ bool LptManager::processCapturedPayload(const std::vector<uint8_t>& incomingByte
     historicalTest.vehicle = historicalVehicle;
   }
 
-  m_LptRepository.createTest(historicalTest, {});
+  if (m_CurrentTestAxleDataStore.isEmpty()) {
+    try {
+      const std::vector<HistoricalAxleResult> parsedAxleResults = parseAxleResultsFromPrnBytes(patchedBytes);
+      if (!parsedAxleResults.empty()) {
+        m_CurrentTestAxleDataStore.setAxleResults(parsedAxleResults);
+        if (m_Log) {
+          m_Log->information("[LptManager Info]: Current axle data store was empty. Parsed " +
+                             std::to_string(parsedAxleResults.size()) + " axle row(s) from PRN data.");
+        }
+      }
+    } catch (const std::exception& analyzerException) {
+      if (m_Log) {
+        m_Log->warning(std::string("[LptManager Warning]: Failed to parse axle data from PRN for fallback: ") +
+                       analyzerException.what());
+      }
+    }
+  }
+
+  const std::vector<HistoricalAxleResult> axleResultsForTest = m_CurrentTestAxleDataStore.getAxleResults();
+  m_LptRepository.createTest(historicalTest, axleResultsForTest);
+  m_CurrentTestAxleDataStore.clear();
   const PrintSettings printSettings = m_PrintSettingsRepository.getPrintSettings();
   if (printSettings.autoPrint) {
     const bool printStarted = m_PrintManager.printPdfFile(historicalTest.pdfFile);
