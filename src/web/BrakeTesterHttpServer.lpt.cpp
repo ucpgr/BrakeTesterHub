@@ -42,14 +42,13 @@ void BrakeTesterHttpServer::configureLptModule() {
   });
 
   m_Impl->server->Post("/api/lpt/upload-prn", [this](const httplib::Request& request, httplib::Response& response) {
-    const auto uploadedFileIt = request.files.find("prn");
-    if (uploadedFileIt == request.files.end()) {
+    if (!request.form.has_file("prn")) {
       response.status = 400;
       response.set_content(R"({"error":"Missing multipart field 'prn'."})", "application/json");
       return;
     }
 
-    const auto& uploadedFile = uploadedFileIt->second;
+    const auto& uploadedFile = request.form.get_file("prn");
     const std::string& payload = uploadedFile.content;
     const std::vector<std::uint8_t> incomingBytes(payload.begin(), payload.end());
 
