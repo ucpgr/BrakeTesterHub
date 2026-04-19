@@ -161,7 +161,7 @@
         <CardTitle class="text-base">
             Test
             <a
-                href="#"
+                href="/api/lpt/upload-prn"
                 class="appearance-none text-inherit no-underline hover:text-inherit focus:text-inherit visited:text-inherit"
                 aria-label="Upload PRN file"
                 onclick={onTestResultsRClick}
