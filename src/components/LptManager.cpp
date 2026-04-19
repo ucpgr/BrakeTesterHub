@@ -116,27 +116,6 @@ void LptManager::start() {
   m_WorkerThread = std::thread([this] {
     while (m_IsRunning) {
       try {
-        const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
-        {
-          std::scoped_lock lock(m_SelectedVehicleUnassignMutex);
-          if (selectedVehicle.reg.empty()) {
-            m_SelectedVehicleUnassignDeadline.reset();
-          } else if (!m_SelectedVehicleUnassignDeadline.has_value()) {
-            const int unassignMinutes = m_SettingsRepository.getVehicleUnassignMinutes();
-            m_SelectedVehicleUnassignDeadline = std::chrono::steady_clock::now() + std::chrono::minutes(unassignMinutes);
-            if (m_Log) {
-              m_Log->information("[LptManager Info]: Vehicle unassign scheduled in " + std::to_string(unassignMinutes) +
-                                 " minute(s) due to active vehicle selection.");
-            }
-          } else if (std::chrono::steady_clock::now() >= *m_SelectedVehicleUnassignDeadline) {
-            m_SelectedVehicleStore.setSelectedVehicle({});
-            m_SelectedVehicleUnassignDeadline.reset();
-            if (m_Log) {
-              m_Log->information("[LptManager Info]: Vehicle selection reset to unassigned after timeout.");
-            }
-          }
-        }
-
         auto incomingBytes = m_Listener->captureTransmission(m_IsRunning);
         if (incomingBytes.empty()) {
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -164,6 +143,7 @@ void LptManager::start() {
       }
     }
   });
+  m_SelectedVehicleWatchdogThread = std::thread([this] { monitorSelectedVehicleTimeout(); });
 }
 
 bool LptManager::ingestPrnPayload(const std::vector<uint8_t>& incomingBytes) {
@@ -212,6 +192,7 @@ bool LptManager::processCapturedPayload(const std::vector<uint8_t>& incomingByte
   {
     std::scoped_lock lock(m_SelectedVehicleUnassignMutex);
     m_SelectedVehicleUnassignDeadline.reset();
+    m_SelectedVehicleDeadlineReg.clear();
   }
   if (m_Log) {
     m_Log->information("[LptManager Info]: Vehicle selection reset to unassigned after successful conversion.");
@@ -275,6 +256,53 @@ bool LptManager::processCapturedPayload(const std::vector<uint8_t>& incomingByte
   return true;
 }
 
+void LptManager::monitorSelectedVehicleTimeout() {
+  while (m_IsRunning) {
+    evaluateSelectedVehicleTimeout();
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+  }
+}
+
+void LptManager::evaluateSelectedVehicleTimeout() {
+  const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
+  std::optional<int> deadlineMinutesToLog;
+  bool shouldUnassignSelectedVehicle = false;
+
+  {
+    std::scoped_lock lock(m_SelectedVehicleUnassignMutex);
+
+    if (selectedVehicle.reg.empty()) {
+      m_SelectedVehicleUnassignDeadline.reset();
+      m_SelectedVehicleDeadlineReg.clear();
+      return;
+    }
+
+    const bool selectedVehicleChanged = (m_SelectedVehicleDeadlineReg != selectedVehicle.reg);
+    if (!m_SelectedVehicleUnassignDeadline.has_value() || selectedVehicleChanged) {
+      const int unassignMinutes = m_SettingsRepository.getVehicleUnassignMinutes();
+      m_SelectedVehicleUnassignDeadline = std::chrono::steady_clock::now() + std::chrono::minutes(unassignMinutes);
+      m_SelectedVehicleDeadlineReg = selectedVehicle.reg;
+      deadlineMinutesToLog = unassignMinutes;
+    } else if (std::chrono::steady_clock::now() >= *m_SelectedVehicleUnassignDeadline) {
+      m_SelectedVehicleUnassignDeadline.reset();
+      m_SelectedVehicleDeadlineReg.clear();
+      shouldUnassignSelectedVehicle = true;
+    }
+  }
+
+  if (deadlineMinutesToLog.has_value() && m_Log) {
+    m_Log->information("[LptManager Info]: Vehicle unassign scheduled in " + std::to_string(*deadlineMinutesToLog) +
+                       " minute(s) due to active vehicle selection.");
+  }
+
+  if (shouldUnassignSelectedVehicle) {
+    m_SelectedVehicleStore.setSelectedVehicle({});
+    if (m_Log) {
+      m_Log->information("[LptManager Info]: Vehicle selection reset to unassigned after timeout.");
+    }
+  }
+}
+
 void LptManager::stop() {
   if (!m_IsRunning.exchange(false)) {
     if (m_Log) {
@@ -296,6 +324,10 @@ void LptManager::stop() {
     }
   } else if (m_Log) {
     m_Log->information("[LptManager Info]: Worker thread was not joinable during stop.");
+  }
+
+  if (m_SelectedVehicleWatchdogThread.joinable()) {
+    m_SelectedVehicleWatchdogThread.join();
   }
 
   if (m_Log) {
