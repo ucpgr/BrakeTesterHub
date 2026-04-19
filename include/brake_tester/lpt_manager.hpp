@@ -7,6 +7,7 @@
 #include <mutex>
 #include <optional>
 #include <thread>
+#include <vector>
 
 #include "brake_tester/interfaces.hpp"
 #include "brake_tester/logging.hpp"
@@ -34,8 +35,10 @@ public:
   void start();
   void stop();
   void sendTestSignal(bool enableTestFlag);
+  bool ingestPrnPayload(const std::vector<uint8_t>& incomingBytes);
 
 private:
+  bool processCapturedPayload(const std::vector<uint8_t>& incomingBytes);
   std::optional<std::string> generateThumbnailForPdf(const std::filesystem::path& pdfPath) const;
   static std::string generateCaptureFilenameWithoutExtension();
   static std::string randomSuffix();
