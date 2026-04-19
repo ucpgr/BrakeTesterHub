@@ -70,6 +70,15 @@ public:
   virtual void setSelectedVehicle(const VehicleSelection& selectedVehicle) = 0;
 };
 
+class ICurrentTestAxleDataStore {
+public:
+  virtual ~ICurrentTestAxleDataStore() = default;
+  virtual std::vector<HistoricalAxleResult> getAxleResults() const = 0;
+  virtual void setAxleResults(const std::vector<HistoricalAxleResult>& axleResults) = 0;
+  virtual bool isEmpty() const = 0;
+  virtual void clear() = 0;
+};
+
 class IVehicleRepository {
 public:
   virtual ~IVehicleRepository() = default;
