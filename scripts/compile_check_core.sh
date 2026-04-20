@@ -19,7 +19,7 @@ COMMON_FLAGS=(
 )
 
 FILES=(
-  src/stores/LptRepository.cpp
+  src/repositories/LptRepository.cpp
 )
 
 echo "[compile_check_core] Using compiler: ${CXX_BIN}"

@@ -1,4 +1,4 @@
-#include "brake_tester/stores/LptRepository.hpp"
+#include "brake_tester/repositories/LptRepository.hpp"
 
 #include <algorithm>
 #include <array>

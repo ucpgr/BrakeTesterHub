@@ -15,6 +15,7 @@
 #include "brake_tester/lpt_manager.hpp"
 #include "brake_tester/print_manager.hpp"
 #include "brake_tester/repositories.hpp"
+#include "brake_tester/stores.hpp"
 #include "brake_tester/stores/SerialDeviceStore.hpp"
 #include "brake_tester/web/BrakeTesterHttpServer.hpp"
 
