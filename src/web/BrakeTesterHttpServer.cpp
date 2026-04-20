@@ -3,6 +3,8 @@
 
 #include <atomic>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <mutex>
 #include <thread>
 #include <unordered_set>
@@ -65,6 +67,24 @@ void BrakeTesterHttpServer::start() {
   if (m_Log) {
     m_Log->information("[BrakeTesterHttpServer Info]: Mounted static files at '/' from " + m_StaticRoot);
   }
+
+  const std::filesystem::path indexPath = std::filesystem::path(m_StaticRoot) / "index.html";
+  m_Impl->server->Get(R"(/(live|settings|history))", [this, indexPath](const httplib::Request& request,
+                                                                        httplib::Response& response) {
+    std::ifstream indexFile(indexPath, std::ios::binary);
+    if (!indexFile.is_open()) {
+      response.status = 500;
+      response.set_content("Unable to load frontend entrypoint", "text/plain");
+      if (m_Log) {
+        m_Log->error("[BrakeTesterHttpServer Error]: Failed to open " + indexPath.string() + " for path " +
+                     request.path);
+      }
+      return;
+    }
+
+    const std::string indexContent((std::istreambuf_iterator<char>(indexFile)), std::istreambuf_iterator<char>());
+    response.set_content(indexContent, "text/html; charset=utf-8");
+  });
 
   const std::string testsRoot = std::filesystem::path("tests").string();
   const bool testsMounted = m_Impl->server->set_mount_point("/tests", testsRoot);
