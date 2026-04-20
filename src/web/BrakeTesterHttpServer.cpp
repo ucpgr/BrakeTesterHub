@@ -76,7 +76,7 @@ void BrakeTesterHttpServer::start() {
       response.status = 500;
       response.set_content("Unable to load frontend entrypoint", "text/plain");
       if (m_Log) {
-        m_Log->error("[BrakeTesterHttpServer Error]: Failed to open " + indexPath.string() + " for path " +
+        m_Log->Error("[BrakeTesterHttpServer Error]: Failed to open " + indexPath.string() + " for path " +
                      request.path);
       }
       return;
