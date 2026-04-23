@@ -18,6 +18,7 @@
 #include "brake_tester/stores.hpp"
 #include "brake_tester/stores/SerialDeviceStore.hpp"
 #include "brake_tester/web/BrakeTesterHttpServer.hpp"
+#include "brake_tester/web/WtHelloServer.hpp"
 
 namespace brake_tester {
 namespace {
@@ -193,6 +194,7 @@ App::App(std::string databasePath) {
       "0.0.0.0",
       80,
       "www");
+  m_WtHelloServer = std::make_unique<WtHelloServer>(m_Log, "0.0.0.0", 8080, ".");
   m_Log->information("[App Info]: Runtime modules constructed successfully.");
 }
 
@@ -207,6 +209,7 @@ void App::run() {
   m_PrintManager->start();
   m_LptManager->start();
   m_HttpServer->start();
+  m_WtHelloServer->start();
   startSerialDeviceRefreshLoop();
   if (m_Log) {
     m_Log->information("[App Info]: Runtime modules started.");
@@ -225,6 +228,16 @@ void App::shutdown() {
     m_HttpServer->stop();
     if (m_Log) {
       m_Log->information("[App Info]: HTTP server module stopped.");
+    }
+  }
+
+  if (m_WtHelloServer) {
+    if (m_Log) {
+      m_Log->information("[App Info]: Stopping Wt hello server module.");
+    }
+    m_WtHelloServer->stop();
+    if (m_Log) {
+      m_Log->information("[App Info]: Wt hello server module stopped.");
     }
   }
 
