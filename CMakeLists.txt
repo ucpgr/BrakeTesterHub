@@ -52,7 +52,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(libserial)
 
-set(Wt_DIR "/usr/local/lib/cmake/Wt")
 find_package(Wt REQUIRED COMPONENTS Wt WtHttp)
 
 
