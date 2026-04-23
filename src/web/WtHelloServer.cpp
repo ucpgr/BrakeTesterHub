@@ -4,6 +4,7 @@
 #include <vector>
 
 #include <Wt/WApplication.h>
+#include <Wt/WContainerWidget.h>
 #include <Wt/WEnvironment.h>
 #include <Wt/WServer.h>
 #include <Wt/WText.h>
