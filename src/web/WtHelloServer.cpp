@@ -7,7 +7,8 @@
 #include <Wt/WContainerWidget.h>
 #include <Wt/WEnvironment.h>
 #include <Wt/WServer.h>
-#include <Wt/WText.h>
+
+#include "brake_tester/ui/routes/components/TopBar.hpp"
 
 namespace brake_tester {
 namespace {
@@ -18,86 +19,12 @@ std::unique_ptr<Wt::WApplication> createHelloApplication(const Wt::WEnvironment&
   auto page = app->root()->addWidget(std::make_unique<Wt::WContainerWidget>());
   page->addStyleClass("wt-page");
 
-  const auto topBarMarkup = R"(
-    <style>
-      .wt-page {
-        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        color: #111827;
-        background: #f8fafc;
-        min-height: 100vh;
-      }
+  app->useStyleSheet("/ui/www/bootstrap-theme.css");
 
-      .topbar {
-        width: 100%;
-        box-sizing: border-box;
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 0.5rem 1rem;
-        border-bottom: 1px solid #e5e7eb;
-        background: #ffffff;
-      }
+  auto mainContainer = page->addWidget(std::make_unique<Wt::WContainerWidget>());
+  mainContainer->setStyleClass("min-vh-100 bg-body");
 
-      .online-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 0.95rem;
-        font-weight: 500;
-        color: #166534;
-        white-space: nowrap;
-      }
-
-      .online-pill::before {
-        content: "";
-        width: 0.65rem;
-        height: 0.65rem;
-        border-radius: 999px;
-        background: #22c55e;
-        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
-      }
-
-      .status {
-        flex: 1;
-        min-width: 0;
-        color: #6b7280;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        font-size: 0.92rem;
-      }
-
-      .nav {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-      }
-
-      .nav-item {
-        border: 1px solid #d1d5db;
-        border-radius: 0.45rem;
-        background: #ffffff;
-        color: #111827;
-        font-size: 0.85rem;
-        font-weight: 500;
-        padding: 0.4rem 0.75rem;
-        white-space: nowrap;
-      }
-    </style>
-
-    <header class="topbar">
-      <div class="online-pill">Connected</div>
-      <div class="status">status messages</div>
-      <nav class="nav">
-        <div class="nav-item">live</div>
-        <div class="nav-item">settings</div>
-        <div class="nav-item">history</div>
-      </nav>
-    </header>
-  )";
-
-  auto topBar = page->addWidget(std::make_unique<Wt::WText>(topBarMarkup, Wt::TextFormat::UnsafeXHTML));
-  topBar->setInline(false);
+  mainContainer->addWidget(ui::routes::components::createTopBar());
 
   return app;
 }
