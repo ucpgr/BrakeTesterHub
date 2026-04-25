@@ -1,0 +1,42 @@
+// Bootstrap theme for the Wt UI.
+// Build example (from repo root):
+//   npx sass --load-path=node_modules ui/bootstrap-theme.scss ui/www/bootstrap-theme.css
+
+@import "bootstrap/scss/functions";
+
+// Approximate hex matches for the Svelte palette in frontend/src/app.css.
+$body-bg: #ffffff;
+$body-color: #0f172a;
+
+$primary: #0f172a;
+$secondary: #f1f5f9;
+$success: #22c55e;
+$info: #0ea5e9;
+$warning: #f59e0b;
+$danger: #ef4444;
+$light: #f8fafc;
+$dark: #0f172a;
+
+$border-color: #e2e8f0;
+$input-border-color: $border-color;
+$input-focus-border-color: #94a3b8;
+$component-active-bg: $primary;
+$link-color: $primary;
+$link-hover-color: #020617;
+
+$theme-colors: (
+  "primary": $primary,
+  "secondary": $secondary,
+  "success": $success,
+  "info": $info,
+  "warning": $warning,
+  "danger": $danger,
+  "light": $light,
+  "dark": $dark
+);
+
+@import "bootstrap/scss/bootstrap";
+
+:root {
+  --bs-border-radius: 0.625rem;
+}
