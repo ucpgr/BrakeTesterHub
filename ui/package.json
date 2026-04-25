@@ -1,0 +1,11 @@
+{
+  "name": "brake-tester-wt-ui-assets",
+  "private": true,
+  "scripts": {
+    "build:bootstrap-theme": "sass --quiet-deps --silence-deprecation=import,global-builtin,color-functions,if-function --load-path=node_modules bootstrap-theme.scss www/bootstrap-theme.css"
+  },
+  "devDependencies": {
+    "bootstrap": "^5.3.8",
+    "sass": "^1.93.2"
+  }
+}

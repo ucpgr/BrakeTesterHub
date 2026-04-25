@@ -1,0 +1,57 @@
+// Bootstrap theme for the Wt UI.
+// Build example (from repo root):
+//   npx sass --load-path=node_modules ui/bootstrap-theme.scss ui/www/bootstrap-theme.css
+
+$body-bg: #0f172a;
+$body-color: #f8fafc;
+
+$primary: #0f172a;
+$secondary: #f1f5f9;
+$success: #22c55e;
+$info: #0ea5e9;
+$warning: #f59e0b;
+$danger: #ef4444;
+$light: #f8fafc;
+$dark: #020617;
+
+$border-color: #334155;
+$input-border-color: $border-color;
+$input-focus-border-color: #94a3b8;
+$component-active-bg: $primary;
+$link-color: #cbd5e1;
+$link-hover-color: #ffffff;
+
+$theme-colors: (
+  "primary": $primary,
+  "secondary": $secondary,
+  "success": $success,
+  "info": $info,
+  "warning": $warning,
+  "danger": $danger,
+  "light": $light,
+  "dark": $dark
+);
+
+@use "bootstrap/scss/bootstrap" with (
+  $body-bg: $body-bg,
+  $body-color: $body-color,
+  $primary: $primary,
+  $secondary: $secondary,
+  $success: $success,
+  $info: $info,
+  $warning: $warning,
+  $danger: $danger,
+  $light: $light,
+  $dark: $dark,
+  $border-color: $border-color,
+  $input-border-color: $input-border-color,
+  $input-focus-border-color: $input-focus-border-color,
+  $component-active-bg: $component-active-bg,
+  $link-color: $link-color,
+  $link-hover-color: $link-hover-color,
+  $theme-colors: $theme-colors
+);
+
+:root {
+  --bs-border-radius: 0.625rem;
+}
