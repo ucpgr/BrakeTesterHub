@@ -22,7 +22,7 @@ std::unique_ptr<Wt::WApplication> createHelloApplication(const Wt::WEnvironment&
   app->useStyleSheet("/ui/www/bootstrap-theme.css");
 
   auto mainContainer = page->addWidget(std::make_unique<Wt::WContainerWidget>());
-  mainContainer->setStyleClass("min-vh-100 bg-body");
+  mainContainer->setStyleClass("min-vh-100 bg-primary text-light");
 
   mainContainer->addWidget(ui::routes::components::createTopBar());
 
