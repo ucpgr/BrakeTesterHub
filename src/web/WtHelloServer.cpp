@@ -20,11 +20,14 @@ std::unique_ptr<Wt::WApplication> createHelloApplication(const Wt::WEnvironment&
   page->addStyleClass("wt-page");
 
   app->useStyleSheet("/ui/www/bootstrap-theme.css");
+  app->useStyleSheet("/resources/themes/default/wt.css");
 
   auto mainContainer = page->addWidget(std::make_unique<Wt::WContainerWidget>());
   mainContainer->setStyleClass("min-vh-100 bg-primary text-light");
 
-  mainContainer->addWidget(ui::routes::components::createTopBar());
+  auto topBar = mainContainer->addWidget(ui::routes::components::createTopBar());
+  topBar->setConnected(true);
+  topBar->setStatus("Ready", ui::routes::components::StatusPriority::Low);
 
   return app;
 }
