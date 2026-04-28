@@ -1,11 +1,9 @@
 #include "brake_tester/ui/routes/components/TopNavBar.hpp"
 
-#include <Wt/WAnchor.h>
 #include <Wt/WContainerWidget.h>
-#include <Wt/WLink.h>
 #include <Wt/WMenu.h>
 #include <Wt/WNavigationBar.h>
-#include <Wt/WMenuItem.h>
+#include <Wt/WStackedWidget.h>
 #include <Wt/WText.h>
 
 #include "brake_tester/ui/routes/components/ConnectionIndicator.hpp"
@@ -28,16 +26,21 @@ TopNavBar::TopNavBar() {
 
   m_navBar->addWidget(std::move(leftSide), Wt::AlignmentFlag::Left);
 
-  auto menu = std::make_unique<Wt::WMenu>();
+  auto* contentStack = addWidget(std::make_unique<Wt::WStackedWidget>());
+  contentStack->hide();
+
+  auto menu = std::make_unique<Wt::WMenu>(contentStack);
   m_menu = menu.get();
   m_menu->setInternalPathEnabled("/");
   m_menu->setStyleClass("navbar-nav ms-lg-3");
 
-  auto homeItem = m_menu->addItem("Home", Wt::WLink(Wt::LinkType::InternalPath, "/home"));
+  auto homeItem = m_menu->addItem("Home", std::make_unique<Wt::WText>("Home"));
   homeItem->setPathComponent("home");
-  auto settingsItem = m_menu->addItem("Settings", Wt::WLink(Wt::LinkType::InternalPath, "/settings"));
+
+  auto settingsItem = m_menu->addItem("Settings", std::make_unique<Wt::WText>("Settings"));
   settingsItem->setPathComponent("settings");
-  auto historyItem = m_menu->addItem("History", Wt::WLink(Wt::LinkType::InternalPath, "/history"));
+
+  auto historyItem = m_menu->addItem("History", std::make_unique<Wt::WText>("History"));
   historyItem->setPathComponent("history");
 
   m_navBar->addMenu(std::move(menu), Wt::AlignmentFlag::Right);
