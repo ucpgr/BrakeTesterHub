@@ -1,0 +1,9 @@
+/*
+ * Minimal local fallback for Wt default theme resource.
+ * The application styling is provided by /ui/www/bootstrap-theme.css.
+ */
+
+html, body {
+  margin: 0;
+  padding: 0;
+}

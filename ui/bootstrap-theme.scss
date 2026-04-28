@@ -1,25 +1,29 @@
-// Bootstrap theme for the Wt UI.
+// Bootstrap 5 theme for the Wt UI, tuned to Bootswatch Slate colors
+// without requiring the external bootswatch package during build.
 // Build example (from repo root):
-//   npx sass --load-path=node_modules ui/bootstrap-theme.scss ui/www/bootstrap-theme.css
+//   cd ui && npm install && npm run build:bootstrap-theme
 
-$body-bg: #0f172a;
-$body-color: #f8fafc;
+$body-bg: #272b30;
+$body-color: #aaa;
 
-$primary: #0f172a;
-$secondary: #f1f5f9;
-$success: #22c55e;
-$info: #0ea5e9;
-$warning: #f59e0b;
-$danger: #ef4444;
-$light: #f8fafc;
-$dark: #020617;
+$primary: #3a3f44;
+$secondary: #7a8288;
+$success: #62c462;
+$info: #5bc0de;
+$warning: #f89406;
+$danger: #ee5f5b;
+$light: #e9ecef;
+$dark: #272b30;
 
-$border-color: #334155;
-$input-border-color: $border-color;
-$input-focus-border-color: #94a3b8;
-$component-active-bg: $primary;
-$link-color: #cbd5e1;
-$link-hover-color: #ffffff;
+$link-color: #fff;
+$link-hover-color: #ccc;
+$border-color: #555;
+$input-bg: #2f343a;
+$input-color: #fff;
+$input-border-color: #555;
+$input-focus-bg: #2f343a;
+$input-focus-color: #fff;
+$input-focus-border-color: #62c462;
 
 $theme-colors: (
   "primary": $primary,
@@ -43,15 +47,14 @@ $theme-colors: (
   $danger: $danger,
   $light: $light,
   $dark: $dark,
-  $border-color: $border-color,
-  $input-border-color: $input-border-color,
-  $input-focus-border-color: $input-focus-border-color,
-  $component-active-bg: $component-active-bg,
   $link-color: $link-color,
   $link-hover-color: $link-hover-color,
+  $border-color: $border-color,
+  $input-bg: $input-bg,
+  $input-color: $input-color,
+  $input-border-color: $input-border-color,
+  $input-focus-bg: $input-focus-bg,
+  $input-focus-color: $input-focus-color,
+  $input-focus-border-color: $input-focus-border-color,
   $theme-colors: $theme-colors
 );
-
-:root {
-  --bs-border-radius: 0.625rem;
-}
