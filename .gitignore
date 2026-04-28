@@ -32,3 +32,4 @@ Thumbs.db
 # vite cache
 .vite/
 ui/www/bootstrap-theme.css
+ui/www/bootstrap-theme.css.map
