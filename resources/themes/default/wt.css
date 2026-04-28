@@ -26,12 +26,8 @@ html, body {
 
 .bt-status-message {
   min-width: 0;
-  max-width: min(46vw, 36rem);
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
   transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, opacity 160ms ease;
-}
-
-@media (max-width: 991.98px) {
-  .bt-status-message {
-    max-width: 62vw;
-  }
 }

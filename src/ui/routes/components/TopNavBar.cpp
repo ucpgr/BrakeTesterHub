@@ -40,7 +40,7 @@ TopNavBar::TopNavBar() {
   layoutRow->addWidget(std::move(leftSide));
 
   auto rightSide = std::make_unique<Wt::WContainerWidget>();
-  rightSide->setStyleClass("d-flex align-items-center ms-auto");
+  rightSide->setStyleClass("d-flex align-items-center ms-auto flex-shrink-0");
 
   auto* contentStack = addWidget(std::make_unique<Wt::WStackedWidget>());
   contentStack->hide();

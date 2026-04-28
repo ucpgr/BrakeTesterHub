@@ -5,7 +5,7 @@
 namespace brake_tester::ui::routes::components {
 
 ConnectionIndicator::ConnectionIndicator() {
-  setStyleClass("d-inline-flex align-items-center gap-2 text-light");
+  setStyleClass("d-inline-flex align-items-center gap-2 text-light flex-shrink-0");
 
   m_dot = addWidget(std::make_unique<Wt::WText>("<span class=\"bt-connection-dot bt-connection-dot--online\"></span>",
                                                 Wt::TextFormat::UnsafeXHTML));
