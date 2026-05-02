@@ -50,6 +50,7 @@ private:
 
   std::atomic_bool m_IsRunning{false};
   std::thread m_WorkerThread;
+  std::thread m_QueuedPayloadThread;
   std::thread m_SelectedVehicleWatchdogThread;
 
   std::unique_ptr<ILptListener> m_Listener;

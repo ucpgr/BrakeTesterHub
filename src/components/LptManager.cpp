@@ -155,6 +155,28 @@ void LptManager::start() {
       }
     }
   });
+  m_QueuedPayloadThread = std::thread([this] {
+    while (m_IsRunning) {
+      try {
+        std::vector<std::uint8_t> queuedPayload;
+        if (!m_PrnPayloadStore.tryDequeue(queuedPayload)) {
+          std::this_thread::sleep_for(std::chrono::milliseconds(50));
+          continue;
+        }
+
+        if (m_Log) {
+          m_Log->information("[LptManager Info]: Processing queued PRN payload. Bytes: " +
+                             std::to_string(queuedPayload.size()));
+        }
+        processCapturedPayload(queuedPayload);
+      } catch (const std::exception& processingException) {
+        if (m_Log) {
+          m_Log->Error(std::string("[LptManager Error]: Queued PRN payload processing failed. ") +
+                       processingException.what());
+        }
+      }
+    }
+  });
   m_SelectedVehicleWatchdogThread = std::thread([this] { monitorSelectedVehicleTimeout(); });
 }
 
@@ -338,6 +360,16 @@ void LptManager::stop() {
     }
   } else if (m_Log) {
     m_Log->information("[LptManager Info]: Worker thread was not joinable during stop.");
+  }
+
+  if (m_QueuedPayloadThread.joinable()) {
+    if (m_Log) {
+      m_Log->information("[LptManager Info]: Waiting for queued payload worker thread to join.");
+    }
+    m_QueuedPayloadThread.join();
+    if (m_Log) {
+      m_Log->information("[LptManager Info]: Queued payload worker thread joined.");
+    }
   }
 
   if (m_SelectedVehicleWatchdogThread.joinable()) {
