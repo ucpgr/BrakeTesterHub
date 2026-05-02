@@ -41,33 +41,59 @@ void BrakeTesterHttpServer::configureLptModule() {
     }
   });
 
-  m_Impl->server->Post("/api/lpt/upload-prn", [this](const httplib::Request& request, httplib::Response& response) {
-    if (!request.form.has_file("prn")) {
-      response.status = 400;
-      response.set_content(R"({"error":"Missing multipart field 'prn'."})", "application/json");
-      return;
+  m_Impl->server->Post("/api/lpt/upload-prn",
+[this](const httplib::Request& request, httplib::Response& response)
+{
+    try
+    {
+        // Force clean termination of HTTP connection
+        response.set_header("Connection", "close");
+
+        if (!request.form.has_file("prn"))
+        {
+            response.status = 400;
+            response.set_content(R"({"error":"Missing multipart field 'prn'."})",
+                                 "application/json");
+            return;
+        }
+
+        const auto uploadedFile = request.form.get_file("prn");
+
+        // Avoid lifetime/reference edge cases
+        std::string payload = uploadedFile.content;
+
+        std::vector<std::uint8_t> incomingBytes(payload.begin(), payload.end());
+
+        if (incomingBytes.empty())
+        {
+            response.status = 400;
+            response.set_content(R"({"error":"Uploaded PRN file is empty."})",
+                                 "application/json");
+            return;
+        }
+
+        const bool processed = m_LptManager.ingestPrnPayload(incomingBytes);
+
+        if (!processed)
+        {
+            response.status = 422;
+            response.set_content(R"({"error":"Uploaded PRN file did not pass validation."})",
+                                 "application/json");
+            return;
+        }
+
+        response.status = 200;
+        response.set_content(R"({"ok":true})",
+                             "application/json");
     }
-
-    const auto& uploadedFile = request.form.get_file("prn");
-    const std::string& payload = uploadedFile.content;
-    const std::vector<std::uint8_t> incomingBytes(payload.begin(), payload.end());
-
-    if (incomingBytes.empty()) {
-      response.status = 400;
-      response.set_content(R"({"error":"Uploaded PRN file is empty."})", "application/json");
-      return;
+    catch (const std::exception& e)
+    {
+        response.status = 500;
+        response.set_header("Connection", "close");
+        response.set_content(R"({"error":"internal server error"})",
+                             "application/json");
     }
-
-    const bool processed = m_LptManager.ingestPrnPayload(incomingBytes);
-    if (!processed) {
-      response.status = 422;
-      response.set_content(R"({"error":"Uploaded PRN file did not pass validation."})", "application/json");
-      return;
-    }
-
-    response.status = 200;
-    response.set_content(R"({"ok":true})", "application/json");
-  });
+});
 }
 
 void BrakeTesterHttpServer::startLptBroadcastLoop() {
