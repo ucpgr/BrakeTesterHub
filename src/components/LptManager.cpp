@@ -65,6 +65,7 @@ LptManager::LptManager(std::unique_ptr<ILptListener> listener,
                        std::unique_ptr<IPrnWriter> prnWriter,
                        ILptRepository& lptRepository,
                        ICurrentTestAxleDataStore& currentTestAxleDataStore,
+                       IPrnPayloadStore& prnPayloadStore,
                        ISelectedVehicleStore& selectedVehicleStore,
                        ILptStore& lptStore,
                        const ISettingsRepository& settingsRepository,
@@ -78,6 +79,7 @@ LptManager::LptManager(std::unique_ptr<ILptListener> listener,
       m_PrnWriter(std::move(prnWriter)),
       m_LptRepository(lptRepository),
       m_CurrentTestAxleDataStore(currentTestAxleDataStore),
+      m_PrnPayloadStore(prnPayloadStore),
       m_SelectedVehicleStore(selectedVehicleStore),
       m_LptStore(lptStore),
       m_SettingsRepository(settingsRepository),
@@ -143,18 +145,42 @@ void LptManager::start() {
       }
     }
   });
+  m_QueuedPayloadThread = std::thread([this] {
+    while (m_IsRunning) {
+      try {
+        std::vector<std::uint8_t> queuedPayload;
+        if (!m_PrnPayloadStore.tryDequeue(queuedPayload)) {
+          std::this_thread::sleep_for(std::chrono::milliseconds(50));
+          continue;
+        }
+
+        if (m_Log) {
+          m_Log->information("[LptManager Info]: Processing queued PRN payload. Bytes: " +
+                             std::to_string(queuedPayload.size()));
+        }
+        processCapturedPayload(queuedPayload);
+      } catch (const std::exception& processingException) {
+        if (m_Log) {
+          m_Log->Error(std::string("[LptManager Error]: Queued PRN payload processing failed. ") +
+                       processingException.what());
+        }
+      }
+    }
+  });
   m_SelectedVehicleWatchdogThread = std::thread([this] { monitorSelectedVehicleTimeout(); });
 }
 
 bool LptManager::ingestPrnPayload(const std::vector<uint8_t>& incomingBytes) {
-  try {
-    return processCapturedPayload(incomingBytes);
-  } catch (const std::exception& processingException) {
-    if (m_Log) {
-      m_Log->Error(std::string("[LptManager Error]: Failed to ingest PRN payload. ") + processingException.what());
-    }
+  if (incomingBytes.empty()) {
     return false;
   }
+
+  m_PrnPayloadStore.enqueue(incomingBytes);
+  if (m_Log) {
+    m_Log->information("[LptManager Info]: PRN payload queued for async processing. Bytes: " +
+                       std::to_string(incomingBytes.size()));
+  }
+  return true;
 }
 
 bool LptManager::processCapturedPayload(const std::vector<uint8_t>& incomingBytes) {
@@ -324,6 +350,16 @@ void LptManager::stop() {
     }
   } else if (m_Log) {
     m_Log->information("[LptManager Info]: Worker thread was not joinable during stop.");
+  }
+
+  if (m_QueuedPayloadThread.joinable()) {
+    if (m_Log) {
+      m_Log->information("[LptManager Info]: Waiting for queued payload worker thread to join.");
+    }
+    m_QueuedPayloadThread.join();
+    if (m_Log) {
+      m_Log->information("[LptManager Info]: Queued payload worker thread joined.");
+    }
   }
 
   if (m_SelectedVehicleWatchdogThread.joinable()) {
