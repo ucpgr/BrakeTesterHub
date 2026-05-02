@@ -26,6 +26,7 @@ public:
              std::unique_ptr<IPrnWriter> prnWriter,
              ILptRepository& lptRepository,
              ICurrentTestAxleDataStore& currentTestAxleDataStore,
+             IPrnPayloadStore& prnPayloadStore,
              ISelectedVehicleStore& selectedVehicleStore,
              ILptStore& lptStore,
              const ISettingsRepository& settingsRepository,
@@ -58,6 +59,7 @@ private:
   std::unique_ptr<IPrnWriter> m_PrnWriter;
   ILptRepository& m_LptRepository;
   ICurrentTestAxleDataStore& m_CurrentTestAxleDataStore;
+  IPrnPayloadStore& m_PrnPayloadStore;
   ISelectedVehicleStore& m_SelectedVehicleStore;
   ILptStore& m_LptStore;
   const ISettingsRepository& m_SettingsRepository;

@@ -19,6 +19,7 @@ class PrintSettingsRepository;
 class VehicleRepository;
 class LptRepository;
 class CurrentTestAxleDataStore;
+class PrnPayloadStore;
 class SelectedVehicleStore;
 class LptStore;
 class SerialDeviceStore;
@@ -44,6 +45,7 @@ private:
   std::unique_ptr<VehicleRepository> m_VehicleRepository;
   std::unique_ptr<LptRepository> m_LptRepository;
   std::unique_ptr<CurrentTestAxleDataStore> m_CurrentTestAxleDataStore;
+  std::unique_ptr<PrnPayloadStore> m_PrnPayloadStore;
   std::unique_ptr<SelectedVehicleStore> m_SelectedVehicleStore;
   std::unique_ptr<LptStore> m_LptStore;
   std::unique_ptr<SerialDeviceStore> m_SerialDeviceStore;

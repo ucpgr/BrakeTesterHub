@@ -79,6 +79,13 @@ public:
   virtual void clear() = 0;
 };
 
+class IPrnPayloadStore {
+public:
+  virtual ~IPrnPayloadStore() = default;
+  virtual void enqueue(std::vector<std::uint8_t> payload) = 0;
+  virtual bool tryDequeue(std::vector<std::uint8_t>& payload) = 0;
+};
+
 class IVehicleRepository {
 public:
   virtual ~IVehicleRepository() = default;
