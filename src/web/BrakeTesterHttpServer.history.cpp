@@ -1,4 +1,6 @@
 #include "brake_tester/web/BrakeTesterHttpServer.hpp"
+#include "brake_tester/lpt_manager.hpp"
+#include "brake_tester/print_manager.hpp"
 #include "web/BrakeTesterHttpServerInternal.hpp"
 
 #include <filesystem>
