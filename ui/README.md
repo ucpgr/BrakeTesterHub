@@ -1,7 +1,7 @@
-# Wt UI assets
+# UI assets
 
-- Source SCSS for the Wt Bootstrap theme lives in `ui/bootstrap-theme.scss`.
-- Compiled static assets served by Wt live in `ui/www`.
+- Source SCSS for the Bootstrap theme lives in `ui/bootstrap-theme.scss`.
+- Compiled static assets served by the app live in `ui/www`.
 
 ## Build
 

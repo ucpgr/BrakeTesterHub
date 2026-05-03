@@ -52,8 +52,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(libserial)
 
-find_package(Wt REQUIRED COMPONENTS Wt WtHttp)
-
 
 file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
     src/*.cpp
@@ -77,8 +75,6 @@ target_link_libraries(BrakeTesterHub PRIVATE
     nlohmann_json::nlohmann_json
     Threads::Threads
     ${CUPS_LIBRARY}
-    Wt::Wt
-    Wt::HTTP
 )
 
 target_compile_definitions(BrakeTesterHub PRIVATE
