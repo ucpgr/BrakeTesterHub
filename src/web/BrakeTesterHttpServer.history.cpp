@@ -1,9 +1,12 @@
 #include "brake_tester/web/BrakeTesterHttpServer.hpp"
+#include "brake_tester/lpt_manager.hpp"
+#include "brake_tester/print_manager.hpp"
 #include "web/BrakeTesterHttpServerInternal.hpp"
 
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <cstdlib>
 
 #include <httplib.h>
 #include <nlohmann/json.hpp>
@@ -193,11 +196,87 @@ void BrakeTesterHttpServer::configureHistoryModule() {
     }
   });
 
+
+  m_Impl->server->Post(R"(/api/history/(\d+)/print)", [this](const httplib::Request& request, httplib::Response& response) {
+    try {
+      const int testId = std::stoi(request.matches[1].str());
+      HistoricalTestDetails details;
+      if (!m_LptRepository.tryGetTestDetails(testId, details)) {
+        response.status = 404;
+        response.set_content(nlohmann::json({{"error", "Test not found"}}).dump(), "application/json");
+        return;
+      }
+      const bool started = m_PrintManager.printPdfFile(details.test.pdfFile);
+      response.set_content(nlohmann::json({{"started", started}}).dump(), "application/json");
+    } catch (const std::exception& ex) {
+      response.status = 500;
+      response.set_content(nlohmann::json({{"error", ex.what()}}).dump(), "application/json");
+    }
+  });
+
   m_Impl->server->Delete(R"(/api/history/(\d+))", [this](const httplib::Request& request, httplib::Response& response) {
     try {
       const int testId = std::stoi(request.matches[1].str());
+      HistoricalTestDetails details;
+      if (!m_LptRepository.tryGetTestDetails(testId, details)) {
+        response.set_content(nlohmann::json({{"deleted", false}}).dump(), "application/json");
+        return;
+      }
       const bool deleted = m_LptRepository.deleteTest(testId);
+      if (deleted) {
+        if (!details.test.pdfFile.empty()) { std::filesystem::remove(std::filesystem::path(details.test.pdfFile)); }
+        if (details.test.prnFile.has_value()) { std::filesystem::remove(std::filesystem::path(*details.test.prnFile)); }
+        if (details.test.thumbnailFile.has_value()) { std::filesystem::remove(std::filesystem::path(*details.test.thumbnailFile)); }
+      }
       response.set_content(nlohmann::json({{"deleted", deleted}}).dump(), "application/json");
+    } catch (const std::exception& ex) {
+      response.status = 500;
+      response.set_content(nlohmann::json({{"error", ex.what()}}).dump(), "application/json");
+    }
+  });
+
+
+  m_Impl->server->Post(R"(/api/history/(\d+)/assign-vehicle)", [this](const httplib::Request& request, httplib::Response& response) {
+    try {
+      const int testId = std::stoi(request.matches[1].str());
+      const auto payload = nlohmann::json::parse(request.body);
+      const int vehicleId = payload.value("vehicleId", 0);
+      if (vehicleId <= 0) {
+        response.status = 400;
+        response.set_content(nlohmann::json({{"error", "vehicleId is required"}}).dump(), "application/json");
+        return;
+      }
+
+      HistoricalTestDetails details;
+      VehicleSelection vehicle;
+      if (!m_LptRepository.tryGetTestDetails(testId, details) || !m_VehicleRepository.tryGetVehicle(vehicleId, vehicle) || !details.test.prnFile.has_value()) {
+        response.status = 404;
+        response.set_content(nlohmann::json({{"error", "Test, vehicle, or PRN not found"}}).dump(), "application/json");
+        return;
+      }
+
+      std::ifstream prnStream(*details.test.prnFile, std::ios::binary);
+      std::vector<std::uint8_t> prnBytes((std::istreambuf_iterator<char>(prnStream)), std::istreambuf_iterator<char>());
+      if (prnBytes.empty()) {
+        response.status = 422;
+        response.set_content(nlohmann::json({{"error", "PRN file is empty"}}).dump(), "application/json");
+        return;
+      }
+
+      m_SelectedVehicleStore.setSelectedVehicle(vehicle);
+      std::filesystem::remove(std::filesystem::path(details.test.pdfFile));
+      if (details.test.thumbnailFile.has_value()) { std::filesystem::remove(std::filesystem::path(*details.test.thumbnailFile)); }
+      const std::filesystem::path oldPrnPath(*details.test.prnFile);
+      const std::string stem = oldPrnPath.stem().string();
+      const bool queued = m_LptManager.ingestPrnPayload(prnBytes, PrnPayloadSource::UploadedFile, stem);
+      if (!queued) {
+        response.status = 422;
+        response.set_content(nlohmann::json({{"error", "PRN payload validation failed"}}).dump(), "application/json");
+        return;
+      }
+
+      m_LptRepository.deleteTest(testId);
+      response.set_content(nlohmann::json({{"queued", true}}).dump(), "application/json");
     } catch (const std::exception& ex) {
       response.status = 500;
       response.set_content(nlohmann::json({{"error", ex.what()}}).dump(), "application/json");

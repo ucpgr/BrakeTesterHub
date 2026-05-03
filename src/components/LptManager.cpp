@@ -118,11 +118,11 @@ void LptManager::start() {
   m_WorkerThread = std::thread([this] {
     while (m_IsRunning) {
       try {
-        std::vector<std::uint8_t> queuedPayload;
+        PrnPayload queuedPayload;
         if (m_PrnPayloadStore.tryDequeue(queuedPayload)) {
           if (m_Log) {
             m_Log->information("[LptManager Info]: Processing queued PRN payload. Bytes: " +
-                               std::to_string(queuedPayload.size()));
+                               std::to_string(queuedPayload.bytes.size()));
           }
           processCapturedPayload(queuedPayload);
           continue;
@@ -138,7 +138,7 @@ void LptManager::start() {
                              std::to_string(incomingBytes.size()));
         }
 
-        processCapturedPayload(incomingBytes);
+        processCapturedPayload(PrnPayload{incomingBytes, PrnPayloadSource::LptListener, std::nullopt});
       } catch (const std::exception& processingException) {
         if (m_Log) {
           m_Log->Error(processingException.what());
@@ -158,7 +158,7 @@ void LptManager::start() {
   m_QueuedPayloadThread = std::thread([this] {
     while (m_IsRunning) {
       try {
-        std::vector<std::uint8_t> queuedPayload;
+        PrnPayload queuedPayload;
         if (!m_PrnPayloadStore.tryDequeue(queuedPayload)) {
           std::this_thread::sleep_for(std::chrono::milliseconds(50));
           continue;
@@ -166,7 +166,7 @@ void LptManager::start() {
 
         if (m_Log) {
           m_Log->information("[LptManager Info]: Processing queued PRN payload. Bytes: " +
-                             std::to_string(queuedPayload.size()));
+                             std::to_string(queuedPayload.bytes.size()));
         }
         processCapturedPayload(queuedPayload);
       } catch (const std::exception& processingException) {
@@ -180,12 +180,14 @@ void LptManager::start() {
   m_SelectedVehicleWatchdogThread = std::thread([this] { monitorSelectedVehicleTimeout(); });
 }
 
-bool LptManager::ingestPrnPayload(const std::vector<uint8_t>& incomingBytes) {
+bool LptManager::ingestPrnPayload(const std::vector<uint8_t>& incomingBytes,
+                                  PrnPayloadSource source,
+                                  const std::optional<std::string>& preferredFilenameWithoutExtension) {
   if (incomingBytes.empty()) {
     return false;
   }
 
-  m_PrnPayloadStore.enqueue(incomingBytes);
+  m_PrnPayloadStore.enqueue(PrnPayload{incomingBytes, source, preferredFilenameWithoutExtension});
   if (m_Log) {
     m_Log->information("[LptManager Info]: PRN payload queued for async processing. Bytes: " +
                        std::to_string(incomingBytes.size()));
@@ -193,19 +195,20 @@ bool LptManager::ingestPrnPayload(const std::vector<uint8_t>& incomingBytes) {
   return true;
 }
 
-bool LptManager::processCapturedPayload(const std::vector<uint8_t>& incomingBytes) {
+bool LptManager::processCapturedPayload(const PrnPayload& payload) {
+  const auto& incomingBytes = payload.bytes;
   if (!m_PrnValidator || !m_PrnValidator->verifyTemplate(incomingBytes)) {
     return false;
   }
 
   m_LptStore.setProcessStatus(LptProcessStatus::TransferStarted);
-  const auto captureFilename = generateCaptureFilenameWithoutExtension();
+  const auto captureFilename = payload.preferredFilenameWithoutExtension.value_or(generateCaptureFilenameWithoutExtension());
   m_LptStore.setCurrentCaptureFilename(captureFilename);
   if (m_Log) {
     m_Log->information("[LptManager Info]: Capture file key assigned: " + captureFilename);
   }
 
-  auto patchedBytes = m_Patcher->patch(incomingBytes);
+  auto patchedBytes = m_Patcher->patch(payload);
   m_LptStore.setLptTestEnabled(false);
   m_LptStore.setProcessStatus(LptProcessStatus::DataPatched);
   if (m_Log) {

@@ -105,6 +105,17 @@ struct RenderedPage {
   std::size_t height{0};
 };
 
+enum class PrnPayloadSource {
+  LptListener,
+  UploadedFile
+};
+
+struct PrnPayload {
+  std::vector<std::uint8_t> bytes;
+  PrnPayloadSource source{PrnPayloadSource::LptListener};
+  std::optional<std::string> preferredFilenameWithoutExtension;
+};
+
 enum class LptListenerStatus {
   Idle,
   CaptureStarted

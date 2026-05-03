@@ -72,7 +72,7 @@ void BrakeTesterHttpServer::configureLptModule() {
             return;
         }
 
-        const bool processed = m_LptManager.ingestPrnPayload(incomingBytes);
+        const bool processed = m_LptManager.ingestPrnPayload(incomingBytes, PrnPayloadSource::UploadedFile);
 
         if (!processed)
         {

@@ -2,12 +2,12 @@
 
 namespace brake_tester {
 
-void PrnPayloadStore::enqueue(std::vector<std::uint8_t> payload) {
+void PrnPayloadStore::enqueue(PrnPayload payload) {
   std::scoped_lock lock(m_Mutex);
   m_PayloadQueue.push(std::move(payload));
 }
 
-bool PrnPayloadStore::tryDequeue(std::vector<std::uint8_t>& payload) {
+bool PrnPayloadStore::tryDequeue(PrnPayload& payload) {
   std::scoped_lock lock(m_Mutex);
   if (m_PayloadQueue.empty()) {
     return false;
