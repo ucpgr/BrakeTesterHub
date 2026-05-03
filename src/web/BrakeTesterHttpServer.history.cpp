@@ -266,9 +266,10 @@ void BrakeTesterHttpServer::configureHistoryModule() {
       m_SelectedVehicleStore.setSelectedVehicle(vehicle);
       std::filesystem::remove(std::filesystem::path(details.test.pdfFile));
       if (details.test.thumbnailFile.has_value()) { std::filesystem::remove(std::filesystem::path(*details.test.thumbnailFile)); }
-      const std::filesystem::path oldPrnPath(*details.test.prnFile);
-      const std::string stem = oldPrnPath.stem().string();
-      const bool queued = m_LptManager.ingestPrnPayload(prnBytes, PrnPayloadSource::UploadedFile, stem);
+      auto preferredOutputPath = std::filesystem::path(*details.test.prnFile);
+      preferredOutputPath.replace_extension();
+      const bool queued =
+          m_LptManager.ingestPrnPayload(prnBytes, PrnPayloadSource::UploadedFile, preferredOutputPath.string());
       if (!queued) {
         response.status = 422;
         response.set_content(nlohmann::json({{"error", "PRN payload validation failed"}}).dump(), "application/json");
