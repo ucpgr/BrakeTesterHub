@@ -416,23 +416,29 @@
 </Card>
 {#if deleteTarget}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-    <div class="rounded bg-background p-4">
-      <p>Are you sure you want to delete this test? {deleteTarget.vehicle?.reg || 'Unknown'} {formatDateTime(deleteTarget.createdAtUtc)}</p>
-      <div class="mt-3 flex gap-2"><button on:click={deleteTest}>Yes</button><button on:click={() => (deleteTarget = null)}>Cancel</button></div>
+    <div class="rounded border border-border bg-background p-4 text-foreground shadow-lg">
+      <p class="text-sm text-foreground">Are you sure you want to delete this test? {deleteTarget.vehicle?.reg || 'Unknown'} {formatDateTime(deleteTarget.createdAtUtc)}</p>
+      <div class="mt-3 flex gap-2">
+        <button class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/50" on:click={deleteTest}>Yes</button>
+        <button class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/50" on:click={() => (deleteTarget = null)}>Cancel</button>
+      </div>
     </div>
   </div>
 {/if}
 {#if assignTarget}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-    <div class="rounded bg-background p-4">
-      <p>Select vehicle</p>
-      <select bind:value={assignVehicleId} class="mt-2 h-8 rounded border px-2">
+    <div class="rounded border border-border bg-background p-4 text-foreground shadow-lg">
+      <p class="text-sm text-foreground">Select vehicle</p>
+      <select bind:value={assignVehicleId} class="mt-2 h-8 rounded border border-border bg-background px-2 text-sm text-foreground">
         <option value="">Select vehicle</option>
         {#each vehicles as v}
           <option value={v.id}>{v.reg} — {v.make} {v.model}</option>
         {/each}
       </select>
-      <div class="mt-3 flex gap-2"><button on:click={saveVehicleAssignment}>Save</button><button on:click={() => { assignTarget = null; assignVehicleId = ''; }}>Cancel</button></div>
+      <div class="mt-3 flex gap-2">
+        <button class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/50" on:click={saveVehicleAssignment}>Save</button>
+        <button class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/50" on:click={() => { assignTarget = null; assignVehicleId = ''; }}>Cancel</button>
+      </div>
     </div>
   </div>
 {/if}
