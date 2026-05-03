@@ -13,7 +13,6 @@ namespace brake_tester {
 
 class LptManager;
 class BrakeTesterHttpServer;
-class WtHelloServer;
 class SettingsRepository;
 class PrintSettingsRepository;
 class VehicleRepository;
@@ -53,7 +52,6 @@ private:
   std::unique_ptr<LptManager> m_LptManager;
   std::unique_ptr<PrintManager> m_PrintManager;
   std::unique_ptr<BrakeTesterHttpServer> m_HttpServer;
-  std::unique_ptr<WtHelloServer> m_WtHelloServer;
   std::thread m_SerialDeviceRefreshThread;
   std::atomic_bool m_IsSerialDeviceRefreshRunning{false};
 };

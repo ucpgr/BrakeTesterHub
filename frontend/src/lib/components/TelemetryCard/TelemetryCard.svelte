@@ -84,7 +84,7 @@
 
             <!-- WEIGHT -->
             <div class="flex flex-col items-center justify-end pb-2">
-                <span class="text-xs text-muted-foreground">AXLE WT</span>
+                <span class="text-xs text-muted-foreground">AXLE WEIGHT</span>
                 <span class="text-lg font-semibold tabular-nums">
           {$telemetry.axleWeight.toFixed(0)} kg
         </span>
