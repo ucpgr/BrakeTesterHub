@@ -10,6 +10,14 @@
 namespace brake_tester {
 
 void BrakeTesterHttpServer::configureVehicleModule() {
+  m_Impl->server->Get("/api/vehicles/list", [this](const httplib::Request&, httplib::Response& response) {
+    nlohmann::json vehicleItems = nlohmann::json::array();
+    for (const auto& vehicle : m_VehicleRepository.getVehicles()) {
+      vehicleItems.push_back({{"id", vehicle.id}, {"reg", vehicle.reg}, {"make", vehicle.make}, {"model", vehicle.model}});
+    }
+    response.set_content(nlohmann::json({{"vehicles", vehicleItems}}).dump(), "application/json");
+  });
+
   if (m_Log) {
     m_Log->information("[BrakeTesterHttpServer Info]: Configuring vehicle websocket module at /api/vehicles.");
   }
