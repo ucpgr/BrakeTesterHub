@@ -114,6 +114,7 @@ struct PrnPayload {
   std::vector<std::uint8_t> bytes;
   PrnPayloadSource source{PrnPayloadSource::LptListener};
   std::optional<std::string> preferredFilenameWithoutExtension;
+  std::optional<std::string> preservedCreatedAtUtc;
 };
 
 enum class LptListenerStatus {

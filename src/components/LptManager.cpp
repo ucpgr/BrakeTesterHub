@@ -182,12 +182,13 @@ void LptManager::start() {
 
 bool LptManager::ingestPrnPayload(const std::vector<uint8_t>& incomingBytes,
                                   PrnPayloadSource source,
-                                  const std::optional<std::string>& preferredFilenameWithoutExtension) {
+                                  const std::optional<std::string>& preferredFilenameWithoutExtension,
+                                  const std::optional<std::string>& preservedCreatedAtUtc) {
   if (incomingBytes.empty()) {
     return false;
   }
 
-  m_PrnPayloadStore.enqueue(PrnPayload{incomingBytes, source, preferredFilenameWithoutExtension});
+  m_PrnPayloadStore.enqueue(PrnPayload{incomingBytes, source, preferredFilenameWithoutExtension, preservedCreatedAtUtc});
   if (m_Log) {
     m_Log->information("[LptManager Info]: PRN payload queued for async processing. Bytes: " +
                        std::to_string(incomingBytes.size()));
@@ -248,7 +249,7 @@ bool LptManager::processCapturedPayload(const PrnPayload& payload) {
   }
 
   HistoricalTest historicalTest;
-  historicalTest.createdAtUtc = currentUtcIsoDateTime();
+  historicalTest.createdAtUtc = payload.preservedCreatedAtUtc.value_or(currentUtcIsoDateTime());
   historicalTest.prnFile = captureFilename + ".prn";
   historicalTest.pdfFile = captureFilename + ".prn.pdf";
   historicalTest.thumbnailFile = thumbnailFilePath;

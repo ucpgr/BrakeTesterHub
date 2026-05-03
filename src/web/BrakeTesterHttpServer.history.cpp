@@ -269,7 +269,10 @@ void BrakeTesterHttpServer::configureHistoryModule() {
       auto preferredOutputPath = std::filesystem::path(*details.test.prnFile);
       preferredOutputPath.replace_extension();
       const bool queued =
-          m_LptManager.ingestPrnPayload(prnBytes, PrnPayloadSource::UploadedFile, preferredOutputPath.string());
+          m_LptManager.ingestPrnPayload(prnBytes,
+                                        PrnPayloadSource::UploadedFile,
+                                        preferredOutputPath.string(),
+                                        details.test.createdAtUtc);
       if (!queued) {
         response.status = 422;
         response.set_content(nlohmann::json({{"error", "PRN payload validation failed"}}).dump(), "application/json");

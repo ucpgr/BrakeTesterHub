@@ -29,7 +29,7 @@ std::vector<std::uint8_t> PrnPatcher::patch(const PrnPayload& payload) {
   const bool ignoreDateTime = payload.source == PrnPayloadSource::UploadedFile;
 
   for (const auto& [patchOffset, patchGenerator] : m_Patches) {
-    if (ignoreDateTime && (patchOffset == 1175 || patchOffset == 1187)) {
+    if (ignoreDateTime && (patchOffset == 0x27c1 || patchOffset == 0x2811)) {
       continue;
     }
     const std::string replacementText = patchGenerator(selectedVehicle);
