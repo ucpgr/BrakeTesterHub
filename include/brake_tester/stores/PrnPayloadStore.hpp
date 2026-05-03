@@ -11,12 +11,12 @@ namespace brake_tester {
 
 class PrnPayloadStore final : public IPrnPayloadStore {
 public:
-  void enqueue(std::vector<std::uint8_t> payload) override;
-  bool tryDequeue(std::vector<std::uint8_t>& payload) override;
+  void enqueue(PrnPayload payload) override;
+  bool tryDequeue(PrnPayload& payload) override;
 
 private:
   std::mutex m_Mutex;
-  std::queue<std::vector<std::uint8_t>> m_PayloadQueue;
+  std::queue<PrnPayload> m_PayloadQueue;
 };
 
 } // namespace brake_tester
