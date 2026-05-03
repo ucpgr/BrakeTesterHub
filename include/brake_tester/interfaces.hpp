@@ -82,8 +82,8 @@ public:
 class IPrnPayloadStore {
 public:
   virtual ~IPrnPayloadStore() = default;
-  virtual void enqueue(std::vector<std::uint8_t> payload) = 0;
-  virtual bool tryDequeue(std::vector<std::uint8_t>& payload) = 0;
+  virtual void enqueue(PrnPayload payload) = 0;
+  virtual bool tryDequeue(PrnPayload& payload) = 0;
 };
 
 class IVehicleRepository {
@@ -129,7 +129,7 @@ public:
 class IPrnPatcher {
 public:
   virtual ~IPrnPatcher() = default;
-  virtual std::vector<std::uint8_t> patch(const std::vector<std::uint8_t>& inputBytes) = 0;
+  virtual std::vector<std::uint8_t> patch(const PrnPayload& payload) = 0;
 };
 
 class IPrnValidator {
