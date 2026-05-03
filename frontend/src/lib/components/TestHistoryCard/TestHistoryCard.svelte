@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { Trash2, Printer, CarFront } from 'lucide-svelte';
   import { Card, CardHeader, CardTitle, CardContent } from '$lib/components/ui/card';
 
   const perPageOptions = Array.from({ length: 10 }, (_, index) => (index + 1) * 10);
@@ -23,6 +24,10 @@
   let filterVehicles = [];
   let totalCount = 0;
   let detailsByTestId = {};
+  let vehicles = [];
+  let deleteTarget = null;
+  let assignTarget = null;
+  let assignVehicleId = '';
 
   function formatDateTime(utcText) {
     if (!utcText) return 'Unknown date';
@@ -144,6 +149,11 @@
       }
 
       await fetchDetailsForTests(tests);
+      const vehicleResponse = await fetch('/api/vehicles/list');
+      if (vehicleResponse.ok) {
+        const v = await vehicleResponse.json();
+        vehicles = Array.isArray(v.vehicles) ? v.vehicles : [];
+      }
     } catch (error) {
       console.error('Failed to fetch history', error);
       errorText = 'Failed to load history.';
@@ -182,6 +192,21 @@
 
   function preventEventBubble(event) {
     event.stopPropagation();
+  }
+
+  async function printTest(test) { await fetch(`/api/history/${test.id}/print`, { method: 'POST' }); }
+  async function deleteTest() {
+    if (!deleteTarget) return;
+    await fetch(`/api/history/${deleteTarget.id}`, { method: 'DELETE' });
+    deleteTarget = null;
+    await loadHistory();
+  }
+  async function saveVehicleAssignment() {
+    if (!assignTarget || !assignVehicleId) return;
+    await fetch(`/api/history/${assignTarget.id}/assign-vehicle`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vehicleId: Number(assignVehicleId) }) });
+    assignTarget = null;
+    assignVehicleId = '';
+    await loadHistory();
   }
 
   onMount(async () => {
@@ -297,7 +322,14 @@
               {/if}
 
               <div class="min-w-0 space-y-2 text-left">
-                <div class="text-sm font-semibold {test.vehicle?.reg ? 'text-foreground' : 'text-muted-foreground'}">{test.vehicle?.reg || 'NA'}</div>
+                <div class="flex items-center gap-2 text-sm font-semibold {test.vehicle?.reg ? 'text-foreground' : 'text-muted-foreground'}">
+                  <button on:click={() => printTest(test)} title="Print PDF"><Printer class="h-4 w-4" /></button>
+                  <button on:click={() => (deleteTarget = test)} title="Delete test"><Trash2 class="h-4 w-4 text-red-500" /></button>
+                  {#if !test.vehicle?.reg}
+                    <button on:click={() => (assignTarget = test)} title="Assign vehicle"><CarFront class="h-4 w-4 text-amber-500" /></button>
+                  {/if}
+                  <span>{test.vehicle?.reg || 'NA'}</span>
+                </div>
                 <div class="text-xs text-muted-foreground">{formatDateTime(test.createdAtUtc)}</div>
                 {#if test.pdfFile && pdfHrefForTest(test)}
                   <a
@@ -382,3 +414,31 @@
     {/if}
   </CardContent>
 </Card>
+{#if deleteTarget}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div class="rounded border border-border bg-background p-4 text-foreground shadow-lg">
+      <p class="text-sm text-foreground">Are you sure you want to delete this test? {deleteTarget.vehicle?.reg || 'Unknown'} {formatDateTime(deleteTarget.createdAtUtc)}</p>
+      <div class="mt-3 flex gap-2">
+        <button class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/50" on:click={deleteTest}>Yes</button>
+        <button class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/50" on:click={() => (deleteTarget = null)}>Cancel</button>
+      </div>
+    </div>
+  </div>
+{/if}
+{#if assignTarget}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div class="rounded border border-border bg-background p-4 text-foreground shadow-lg">
+      <p class="text-sm text-foreground">Select vehicle</p>
+      <select bind:value={assignVehicleId} class="mt-2 h-8 rounded border border-border bg-background px-2 text-sm text-foreground">
+        <option value="">Select vehicle</option>
+        {#each vehicles as v}
+          <option value={v.id}>{v.reg} — {v.make} {v.model}</option>
+        {/each}
+      </select>
+      <div class="mt-3 flex gap-2">
+        <button class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/50" on:click={saveVehicleAssignment}>Save</button>
+        <button class="rounded border border-border px-3 py-1 text-sm text-foreground hover:bg-muted/50" on:click={() => { assignTarget = null; assignVehicleId = ''; }}>Cancel</button>
+      </div>
+    </div>
+  </div>
+{/if}

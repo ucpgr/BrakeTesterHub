@@ -18,15 +18,20 @@ void PrnPatcher::addPatch(std::size_t patchOffset, PatchGenerator patchGenerator
   }
 }
 
-std::vector<std::uint8_t> PrnPatcher::patch(const std::vector<std::uint8_t>& inputBytes) {
+std::vector<std::uint8_t> PrnPatcher::patch(const PrnPayload& payload) {
+  const auto& inputBytes = payload.bytes;
   if (m_Log) {
     m_Log->information("[PrnPatcher Info]: Applying " + std::to_string(m_Patches.size()) +
                        " patch(es) to " + std::to_string(inputBytes.size()) + " bytes.");
   }
   std::vector<std::uint8_t> patchedOutputBytes = inputBytes;
   const VehicleSelection selectedVehicle = m_SelectedVehicleStore.getSelectedVehicle();
+  const bool ignoreDateTime = payload.source == PrnPayloadSource::UploadedFile;
 
   for (const auto& [patchOffset, patchGenerator] : m_Patches) {
+    if (ignoreDateTime && (patchOffset == 0x27c1 || patchOffset == 0x2811)) {
+      continue;
+    }
     const std::string replacementText = patchGenerator(selectedVehicle);
     if (patchOffset >= patchedOutputBytes.size()) {
       continue;
