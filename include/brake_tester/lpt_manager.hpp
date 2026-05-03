@@ -38,10 +38,13 @@ public:
   void start();
   void stop();
   void sendTestSignal(bool enableTestFlag);
-  bool ingestPrnPayload(const std::vector<uint8_t>& incomingBytes);
+  bool ingestPrnPayload(const std::vector<uint8_t>& incomingBytes,
+                        PrnPayloadSource source = PrnPayloadSource::LptListener,
+                        const std::optional<std::string>& preferredFilenameWithoutExtension = std::nullopt,
+                        const std::optional<std::string>& preservedCreatedAtUtc = std::nullopt);
 
 private:
-  bool processCapturedPayload(const std::vector<uint8_t>& incomingBytes);
+  bool processCapturedPayload(const PrnPayload& payload);
   void monitorSelectedVehicleTimeout();
   void evaluateSelectedVehicleTimeout();
   std::optional<std::string> generateThumbnailForPdf(const std::filesystem::path& pdfPath) const;

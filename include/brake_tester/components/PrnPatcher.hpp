@@ -16,7 +16,7 @@ public:
   PrnPatcher(const ISelectedVehicleStore& selectedVehicleStore, SharedLogger log);
 
   void addPatch(std::size_t patchOffset, PatchGenerator patchGenerator);
-  std::vector<std::uint8_t> patch(const std::vector<std::uint8_t>& inputBytes) override;
+  std::vector<std::uint8_t> patch(const PrnPayload& payload) override;
 
 private:
   const ISelectedVehicleStore& m_SelectedVehicleStore;
