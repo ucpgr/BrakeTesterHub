@@ -19,29 +19,29 @@ public:
   explicit Logger(LogVerbosity verbosity) : m_Verbosity(verbosity) {}
 
   void warning(const std::string& messageText) {
-    write(LogVerbosity::Warning, messageText);
+    write(LogVerbosity::Warning, "[WARNING]", messageText);
   }
 
   void information(const std::string& messageText) {
-    write(LogVerbosity::Information, messageText);
+    write(LogVerbosity::Information, "[INFO]", messageText);
   }
 
-  void Error(const std::string& messageText) {
-    write(LogVerbosity::Error, messageText);
+  void error(const std::string& messageText) {
+    write(LogVerbosity::Error, "[ERROR]", messageText);
   }
 
-  void Critical(const std::string& messageText) {
-    write(LogVerbosity::Critical, messageText);
+  void critical(const std::string& messageText) {
+    write(LogVerbosity::Critical, "[CRITICAL]", messageText);
   }
 
 private:
-  void write(LogVerbosity messageVerbosity, const std::string& messageText) {
+  void write(LogVerbosity messageVerbosity, const char* severity, const std::string& messageText) {
     if (static_cast<int>(messageVerbosity) > static_cast<int>(m_Verbosity)) {
       return;
     }
 
     std::scoped_lock lock(m_Mutex);
-    std::cerr << messageText << '\n';
+    std::cerr << severity << ' ' << messageText << '\n';
   }
 
   LogVerbosity m_Verbosity;

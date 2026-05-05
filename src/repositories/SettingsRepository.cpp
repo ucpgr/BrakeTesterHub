@@ -176,7 +176,7 @@ void SettingsRepository::executeSql(const char* sqlText) const {
     const std::string sqliteError = (errorMessage != nullptr) ? errorMessage : "Unknown sqlite error";
     sqlite3_free(errorMessage);
     if (m_Log) {
-      m_Log->Error("[SettingsRepository Error]: SQL execution failed: " + sqliteError);
+      m_Log->error("[SettingsRepository Error]: SQL execution failed: " + sqliteError);
     }
     throw std::runtime_error(sqliteError);
   }
