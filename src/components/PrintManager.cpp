@@ -75,7 +75,7 @@ std::vector<PrinterDescriptor> PrintManager::listPrinters() const {
 bool PrintManager::printPdfFile(const std::string& pdfFilePath) {
   if (!std::filesystem::exists(pdfFilePath)) {
     if (m_Log) {
-      m_Log->Error("[PrintManager Error]: Requested PDF does not exist: " + pdfFilePath);
+      m_Log->error("[PrintManager Error]: Requested PDF does not exist: " + pdfFilePath);
     }
     m_PrintStatusStore.setStatus("Print failed.");
     return false;
@@ -84,7 +84,7 @@ bool PrintManager::printPdfFile(const std::string& pdfFilePath) {
   const PrintSettings printSettings = m_PrintSettingsRepository.getPrintSettings();
   if (printSettings.selectedPrinter.empty()) {
     if (m_Log) {
-      m_Log->Error("[PrintManager Error]: Cannot print because no printer is selected in print settings.");
+      m_Log->error("[PrintManager Error]: Cannot print because no printer is selected in print settings.");
     }
     m_PrintStatusStore.setStatus("Print failed.");
     return false;

@@ -141,7 +141,7 @@ void LptManager::start() {
         processCapturedPayload(PrnPayload{incomingBytes, PrnPayloadSource::LptListener, std::nullopt});
       } catch (const std::exception& processingException) {
         if (m_Log) {
-          m_Log->Error(processingException.what());
+          m_Log->error(processingException.what());
           m_Log->information("[LptManager Info]: Retrying in 10 seconds.");
         }
 
@@ -171,7 +171,7 @@ void LptManager::start() {
         processCapturedPayload(queuedPayload);
       } catch (const std::exception& processingException) {
         if (m_Log) {
-          m_Log->Error(std::string("[LptManager Error]: Queued PRN payload processing failed. ") +
+          m_Log->error(std::string("[LptManager Error]: Queued PRN payload processing failed. ") +
                        processingException.what());
         }
       }
@@ -395,7 +395,7 @@ void LptManager::sendTestSignal(bool enableTestFlag) {
     }
   } catch (const std::exception& testException) {
     if (m_Log) {
-      m_Log->Error(std::string("[LptManager Error]: Failed to send test signal. ") + testException.what());
+      m_Log->error(std::string("[LptManager Error]: Failed to send test signal. ") + testException.what());
     }
   }
 }

@@ -130,7 +130,7 @@ void PrintSettingsRepository::executeSql(const char* sqlText) const {
     sqlite3_free(errorMessage);
 
     if (m_Log) {
-      m_Log->Error("[PrintSettingsRepository Error]: SQL execution failed. " + sqliteError);
+      m_Log->error("[PrintSettingsRepository Error]: SQL execution failed. " + sqliteError);
     }
 
     throw std::runtime_error(sqliteError);

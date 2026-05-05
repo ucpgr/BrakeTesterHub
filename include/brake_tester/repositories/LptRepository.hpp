@@ -18,7 +18,6 @@ public:
   void setResultsPerPagePreference(int value) override;
 
 private:
-  void initializeSchema() const;
   int ensureHistoricalVehicle(const HistoricalVehicle& vehicle) const;
   void cleanupUnreferencedHistoricalVehicles() const;
   HistoricalFilterOptions buildFilterOptions(const HistoricalTestQuery& query) const;

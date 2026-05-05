@@ -1,6 +1,8 @@
 #include "brake_tester/components/CupsPrinterClient.hpp"
 
+#if BT_ENABLE_CUPS
 #include <cups/cups.h>
+#endif
 
 #include <utility>
 
@@ -25,6 +27,7 @@ CupsPrinterClient::CupsPrinterClient(CupsPrinterClient&&) noexcept = default;
 CupsPrinterClient& CupsPrinterClient::operator=(CupsPrinterClient&&) noexcept = default;
 
 std::vector<PrinterDescriptor> CupsPrinterClient::listPrinters() const {
+#if BT_ENABLE_CUPS
   cups_dest_t* destinations = nullptr;
   const int destinationCount = cupsGetDests(&destinations);
 
@@ -52,12 +55,19 @@ std::vector<PrinterDescriptor> CupsPrinterClient::listPrinters() const {
   }
 
   return printers;
+#else
+  if (m_Impl->log) {
+    m_Impl->log->warning("[CupsPrinterClient Warning]: CUPS support disabled; listPrinters returning empty list.");
+  }
+  return {};
+#endif
 }
 
 std::optional<int> CupsPrinterClient::printPdfFile(const std::string& printerName, const std::string& pdfFilePath) const {
+#if BT_ENABLE_CUPS
   if (printerName.empty() || pdfFilePath.empty()) {
     if (m_Impl->log) {
-      m_Impl->log->Error("[CupsPrinterClient Error]: printPdfFile rejected due to empty printer name or pdf path.");
+      m_Impl->log->error("[CupsPrinterClient Error]: printPdfFile rejected due to empty printer name or pdf path.");
     }
     return std::nullopt;
   }
@@ -65,7 +75,7 @@ std::optional<int> CupsPrinterClient::printPdfFile(const std::string& printerNam
   const int jobId = cupsPrintFile(printerName.c_str(), pdfFilePath.c_str(), "BrakeTesterHub Job", 0, nullptr);
   if (jobId <= 0) {
     if (m_Impl->log) {
-      m_Impl->log->Error("[CupsPrinterClient Error]: cupsPrintFile failed for printer='" + printerName +
+      m_Impl->log->error("[CupsPrinterClient Error]: cupsPrintFile failed for printer='" + printerName +
                          "', file='" + pdfFilePath + "'.");
     }
     return std::nullopt;
@@ -77,9 +87,18 @@ std::optional<int> CupsPrinterClient::printPdfFile(const std::string& printerNam
   }
 
   return jobId;
+#else
+  (void)printerName;
+  (void)pdfFilePath;
+  if (m_Impl->log) {
+    m_Impl->log->warning("[CupsPrinterClient Warning]: CUPS support disabled; printPdfFile is unavailable.");
+  }
+  return std::nullopt;
+#endif
 }
 
 std::string CupsPrinterClient::getJobStatus(const std::string& printerName, int jobId) const {
+#if BT_ENABLE_CUPS
   cups_job_t* jobs = nullptr;
   const int jobCount = cupsGetJobs(&jobs, printerName.empty() ? nullptr : printerName.c_str(), 0, CUPS_WHICHJOBS_ALL);
 
@@ -112,9 +131,18 @@ std::string CupsPrinterClient::getJobStatus(const std::string& printerName, int 
   }
 
   return statusText;
+#else
+  (void)printerName;
+  (void)jobId;
+  if (m_Impl->log) {
+    m_Impl->log->warning("[CupsPrinterClient Warning]: CUPS support disabled; job status is unavailable.");
+  }
+  return "Unknown";
+#endif
 }
 
 bool CupsPrinterClient::cancelJob(const std::string& printerName, int jobId) const {
+#if BT_ENABLE_CUPS
   const int result = cupsCancelJob2(CUPS_HTTP_DEFAULT,
                                     printerName.empty() ? nullptr : printerName.c_str(),
                                     jobId,
@@ -128,10 +156,18 @@ bool CupsPrinterClient::cancelJob(const std::string& printerName, int jobId) con
   }
 
   if (m_Impl->log) {
-    m_Impl->log->Error("[CupsPrinterClient Error]: Failed to cancel job id=" + std::to_string(jobId) +
+    m_Impl->log->error("[CupsPrinterClient Error]: Failed to cancel job id=" + std::to_string(jobId) +
                        " on printer='" + printerName + "'.");
   }
   return false;
+#else
+  (void)printerName;
+  (void)jobId;
+  if (m_Impl->log) {
+    m_Impl->log->warning("[CupsPrinterClient Warning]: CUPS support disabled; cancelJob is unavailable.");
+  }
+  return false;
+#endif
 }
 
 } // namespace brake_tester

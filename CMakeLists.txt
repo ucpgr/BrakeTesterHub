@@ -7,9 +7,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(FetchContent)
 
+option(BT_ENABLE_CUPS "Enable CUPS printing support" ON)
+
 find_package(Threads REQUIRED)
-find_path(CUPS_INCLUDE_DIR cups/cups.h REQUIRED)
-find_library(CUPS_LIBRARY cups REQUIRED)
+if(BT_ENABLE_CUPS)
+    find_path(CUPS_INCLUDE_DIR cups/cups.h REQUIRED)
+    find_library(CUPS_LIBRARY cups REQUIRED)
+endif()
 
 FetchContent_Declare(
     json
@@ -52,9 +56,34 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(libserial)
 
-
-file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
-    src/*.cpp
+set(SRC_FILES
+    src/main.cpp
+    src/app/App.cpp
+    src/components/CupsPrinterClient.cpp
+    src/components/DatabaseSchema.cpp
+    src/components/LptListener.cpp
+    src/components/LptManager.cpp
+    src/components/PrintManager.cpp
+    src/components/PrnPatcher.cpp
+    src/components/PrnRenderer.cpp
+    src/components/PrnValidator.cpp
+    src/components/PrnWriter.cpp
+    src/components/RenderedDocumentWriter.cpp
+    src/repositories/LptRepository.cpp
+    src/repositories/PrintSettingsRepository.cpp
+    src/repositories/SettingsRepository.cpp
+    src/repositories/VehicleRepository.cpp
+    src/stores/CurrentTestAxleDataStore.cpp
+    src/stores/LptStore.cpp
+    src/stores/PrintStatusStore.cpp
+    src/stores/PrnPayloadStore.cpp
+    src/stores/SelectedVehicleStore.cpp
+    src/stores/SerialDeviceStore.cpp
+    src/web/BrakeTesterHttpServer.cpp
+    src/web/BrakeTesterHttpServer.history.cpp
+    src/web/BrakeTesterHttpServer.lpt.cpp
+    src/web/BrakeTesterHttpServer.settings.cpp
+    src/web/BrakeTesterHttpServer.vehicle.cpp
 )
 
 add_executable(BrakeTesterHub ${SRC_FILES})
@@ -66,19 +95,26 @@ target_include_directories(BrakeTesterHub PRIVATE
     ${sqlite_orm_SOURCE_DIR}/include
     ${libserial_SOURCE_DIR}/src
     ${sqlite3_SOURCE_DIR}
-    ${CUPS_INCLUDE_DIR}
 )
+
+if(BT_ENABLE_CUPS)
+    target_include_directories(BrakeTesterHub PRIVATE ${CUPS_INCLUDE_DIR})
+endif()
 
 target_link_libraries(BrakeTesterHub PRIVATE
     ${SQLITE3_LIB}
     libserial_static
     nlohmann_json::nlohmann_json
     Threads::Threads
-    ${CUPS_LIBRARY}
 )
+
+if(BT_ENABLE_CUPS)
+    target_link_libraries(BrakeTesterHub PRIVATE ${CUPS_LIBRARY})
+endif()
 
 target_compile_definitions(BrakeTesterHub PRIVATE
     BT_STATIC_ROOT="www"
+    BT_ENABLE_CUPS=$<IF:$<BOOL:${BT_ENABLE_CUPS}>,1,0>
 )
 
 add_custom_target(compile_check_core

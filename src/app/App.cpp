@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "brake_tester/components.hpp"
+#include "brake_tester/components/DatabaseSchema.hpp"
 #include "brake_tester/lpt_manager.hpp"
 #include "brake_tester/print_manager.hpp"
 #include "brake_tester/repositories.hpp"
@@ -99,6 +100,9 @@ App::App(std::string databasePath) {
     throw std::runtime_error("Failed to open sqlite database");
   }
   m_Log->information("[App Info]: Opened sqlite database at path: " + databasePath);
+
+  DatabaseSchema databaseSchema(m_DatabaseHandle, m_Log);
+  databaseSchema.ensureCreated();
 
   m_SettingsRepository = std::make_unique<SettingsRepository>(m_DatabaseHandle, m_Log);
   m_VehicleRepository = std::make_unique<VehicleRepository>(m_DatabaseHandle, m_Log);
