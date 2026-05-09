@@ -24,6 +24,7 @@ class LptStore;
 class SerialDeviceStore;
 class PrintStatusStore;
 class PrintManager;
+class BrakeTesterSerialDispatcher;
 
 class App {
 public:
@@ -52,6 +53,7 @@ private:
   std::unique_ptr<LptManager> m_LptManager;
   std::unique_ptr<PrintManager> m_PrintManager;
   std::unique_ptr<BrakeTesterHttpServer> m_HttpServer;
+  std::unique_ptr<BrakeTesterSerialDispatcher> m_BrakeTesterSerialDispatcher;
   std::thread m_SerialDeviceRefreshThread;
   std::atomic_bool m_IsSerialDeviceRefreshRunning{false};
 };

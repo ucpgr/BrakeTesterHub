@@ -114,6 +114,7 @@ App::App(std::string databasePath) {
   m_LptStore = std::make_unique<LptStore>();
   m_SerialDeviceStore = std::make_unique<SerialDeviceStore>();
   m_PrintStatusStore = std::make_unique<PrintStatusStore>();
+  m_BrakeTesterSerialDispatcher = std::make_unique<BrakeTesterSerialDispatcher>(*m_SettingsRepository);
 
   auto listener = std::make_unique<LptListener>(*m_SettingsRepository, *m_LptStore, m_Log);
   auto patcher = std::make_unique<PrnPatcher>(*m_SelectedVehicleStore, m_Log);
@@ -213,6 +214,7 @@ void App::run() {
   m_PrintManager->start();
   m_LptManager->start();
   m_HttpServer->start();
+  m_BrakeTesterSerialDispatcher->start();
   startSerialDeviceRefreshLoop();
   if (m_Log) {
     m_Log->information("[App Info]: Runtime modules started.");
@@ -243,6 +245,10 @@ void App::shutdown() {
     if (m_Log) {
       m_Log->information("[App Info]: Serial device refresh thread exited.");
     }
+  }
+
+  if (m_BrakeTesterSerialDispatcher) {
+    m_BrakeTesterSerialDispatcher->stop();
   }
 
   if (m_PrintManager) {

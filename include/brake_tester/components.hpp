@@ -8,3 +8,5 @@
 #include "brake_tester/components/RenderedDocumentWriter.hpp"
 
 #include "brake_tester/components/CupsPrinterClient.hpp"
+
+#include "brake_tester/components/BrakeTesterSerialDispatcher.hpp"
