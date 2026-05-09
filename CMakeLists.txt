@@ -60,6 +60,8 @@ set(SRC_FILES
     src/main.cpp
     src/app/App.cpp
     src/components/CupsPrinterClient.cpp
+    src/components/BrakeTesterSerialDispatcher.cpp
+    src/components/BrakeTesterCodec.cpp
     src/components/DatabaseSchema.cpp
     src/components/LptListener.cpp
     src/components/LptManager.cpp
